@@ -9,6 +9,13 @@ from collections import Counter
 from flask import Flask, render_template, request, jsonify, Response, stream_with_context
 import requests as _req
 
+# ─── Carregar .env automaticamente ───────────────────────────────────────────
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass  # python-dotenv não instalado — usa variáveis já exportadas no shell
+
 app = Flask(__name__)
 app.secret_key = os.urandom(24)
 
@@ -66,7 +73,6 @@ def gemini_stream_sse(historico):
                     try:
                         chunk = json.loads(raw)
                         texto = chunk["candidates"][0]["content"]["parts"][0]["text"]
-                        # Escapar para SSE
                         for ln in texto.splitlines(keepends=True):
                             yield f"data: {json.dumps(ln)}\n\n"
                     except (KeyError, json.JSONDecodeError):
@@ -89,7 +95,9 @@ def get_sms(limite=50, tipo="all", endereco=None):
         result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
         if not result.stdout.strip():
             return []
-        return json.loads(result.stdout)
+        msgs = json.loads(result.stdout)
+        # Inverter: mais recente primeiro
+        return list(reversed(msgs))
     except Exception:
         return []
 
@@ -205,9 +213,9 @@ def api_spam():
     for i in outras_idx:
         classificacoes[i] = "legitimo"
 
-    spam_list     = [msgs[i] for i in range(len(msgs)) if classificacoes.get(i) == "spam"]
-    legitimas     = [msgs[i] for i in range(len(msgs)) if classificacoes.get(i) == "legitimo"]
-    incertas      = [msgs[i] for i in range(len(msgs)) if classificacoes.get(i) not in ("spam", "legitimo")]
+    spam_list = [msgs[i] for i in range(len(msgs)) if classificacoes.get(i) == "spam"]
+    legitimas = [msgs[i] for i in range(len(msgs)) if classificacoes.get(i) == "legitimo"]
+    incertas  = [msgs[i] for i in range(len(msgs)) if classificacoes.get(i) not in ("spam", "legitimo")]
 
     return jsonify({
         "total":     len(msgs),
@@ -229,7 +237,6 @@ def api_remetentes():
 
 @app.route("/api/chat/resumo", methods=["POST"])
 def api_chat_resumo():
-    """Envia contexto inicial e faz stream do resumo automático."""
     data   = request.json or {}
     limite = int(data.get("limite", 100))
     tipo   = data.get("tipo", "all")
@@ -248,8 +255,7 @@ def api_chat_resumo():
         gemini_msg("user", pergunta),
     ]
 
-    # Guardar contexto em ficheiro temporário para reutilizar no /api/chat/perguntar
-    ctx_path = "/tmp/sms_chat_ctx.json"
+    ctx_path = os.path.join(os.path.expanduser("~"), "sms_chat_ctx.json")
     with open(ctx_path, "w") as f:
         json.dump({"sistema": sistema, "historico": []}, f)
 
@@ -261,10 +267,9 @@ def api_chat_resumo():
 
 @app.route("/api/chat/perguntar", methods=["POST"])
 def api_chat_perguntar():
-    """Recebe pergunta + histórico do cliente e faz stream da resposta."""
     data      = request.json or {}
     pergunta  = data.get("pergunta", "")
-    historico = data.get("historico", [])  # [{role, content}] do frontend
+    historico = data.get("historico", [])
     sistema   = data.get("sistema", "")
 
     msgs_gemini = []
@@ -286,7 +291,6 @@ def api_chat_perguntar():
 
 @app.route("/api/chat/remetentes-ia", methods=["POST"])
 def api_remetentes_ia():
-    """Análise Gemini de remetentes suspeitos com SSE."""
     data      = request.json or {}
     suspeitos = data.get("suspeitos", [])
     lista_txt = "\n".join(
@@ -345,7 +349,7 @@ def api_export_json():
 def api_status():
     return jsonify({
         "gemini": bool(gemini_key()),
-        "termux": True,  # assume que está no Termux
+        "termux": True,
     })
 
 if __name__ == "__main__":
