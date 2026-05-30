@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>SAMC — Sistema de Análise de Mensagens Curtas</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+
+<!-- ═══ SIDEBAR ═══ -->
+<aside class="sidebar" id="sidebar">
+  <div class="sidebar-header">
+    <div class="logo">
+      <span class="logo-icon">◈</span>
+      <div>
+        <div class="logo-title">SAMC</div>
+        <div class="logo-sub">Sistema de Análise de Mensagens Curtas</div>
+      </div>
+    </div>
+    <button class="sidebar-close" id="sidebarClose">✕</button>
+  </div>
+
+  <nav class="nav">
+    <div class="nav-group">
+      <div class="nav-label">MENSAGENS</div>
+      <button class="nav-item active" data-view="recentes">
+        <span class="nav-icon">◉</span> Recentes
+      </button>
+      <button class="nav-item" data-view="contacto">
+        <span class="nav-icon">◎</span> Por Contacto
+      </button>
+      <button class="nav-item" data-view="tipo">
+        <span class="nav-icon">◈</span> Por Tipo
+      </button>
+      <button class="nav-item" data-view="pesquisar">
+        <span class="nav-icon">⊕</span> Pesquisar
+      </button>
+      <button class="nav-item" data-view="backup">
+        <span class="nav-icon">⊞</span> Backup
+      </button>
+    </div>
+
+    <div class="nav-group">
+      <div class="nav-label">IA · GEMINI</div>
+      <button class="nav-item" data-view="spam">
+        <span class="nav-icon">⊗</span> Anti-Spam
+      </button>
+      <button class="nav-item" data-view="chat">
+        <span class="nav-icon">◐</span> Chat IA
+      </button>
+      <button class="nav-item" data-view="remetentes">
+        <span class="nav-icon">◑</span> Remetentes
+      </button>
+    </div>
+  </nav>
+
+  <div class="sidebar-status" id="statusBar">
+    <div class="status-dot" id="statusDotGemini"></div>
+    <span id="statusTextGemini">Gemini</span>
+  </div>
+</aside>
+
+<!-- ═══ OVERLAY ═══ -->
+<div class="overlay" id="overlay"></div>
+
+<!-- ═══ MAIN ═══ -->
+<main class="main">
+
+  <!-- Topbar -->
+  <header class="topbar">
+    <button class="menu-btn" id="menuBtn">☰</button>
+    <h1 class="topbar-title" id="topbarTitle">Recentes</h1>
+    <div class="topbar-actions" id="topbarActions"></div>
+  </header>
+
+  <!-- ─── VIEW: RECENTES ─── -->
+  <section class="view active" id="view-recentes">
+    <div class="view-controls">
+      <div class="control-group">
+        <label class="ctrl-label">Mensagens</label>
+        <input type="number" class="ctrl-input" id="rec-limite" value="20" min="1" max="9999">
+      </div>
+      <button class="btn btn-primary" id="rec-carregar">Carregar</button>
+    </div>
+    <div id="rec-lista" class="msg-lista"></div>
+  </section>
+
+  <!-- ─── VIEW: CONTACTO ─── -->
+  <section class="view" id="view-contacto">
+    <div class="view-controls">
+      <div class="control-group" style="flex:1">
+        <label class="ctrl-label">Número ou nome</label>
+        <input type="text" class="ctrl-input" id="con-endereco" placeholder="+258...">
+      </div>
+      <div class="control-group">
+        <label class="ctrl-label">Limite</label>
+        <input type="number" class="ctrl-input" id="con-limite" value="100" min="1">
+      </div>
+      <button class="btn btn-primary" id="con-carregar">Carregar</button>
+    </div>
+    <div id="con-lista" class="msg-lista"></div>
+  </section>
+
+  <!-- ─── VIEW: TIPO ─── -->
+  <section class="view" id="view-tipo">
+    <div class="view-controls">
+      <div class="control-group" style="flex:1">
+        <label class="ctrl-label">Tipo</label>
+        <select class="ctrl-input" id="tip-tipo">
+          <option value="inbox">Inbox</option>
+          <option value="sent">Sent</option>
+          <option value="draft">Draft</option>
+          <option value="outbox">Outbox</option>
+        </select>
+      </div>
+      <div class="control-group">
+        <label class="ctrl-label">Limite</label>
+        <input type="number" class="ctrl-input" id="tip-limite" value="50" min="1">
+      </div>
+      <button class="btn btn-primary" id="tip-carregar">Carregar</button>
+    </div>
+    <div id="tip-lista" class="msg-lista"></div>
+  </section>
+
+  <!-- ─── VIEW: PESQUISAR ─── -->
+  <section class="view" id="view-pesquisar">
+    <div class="view-controls">
+      <div class="control-group" style="flex:1">
+        <label class="ctrl-label">Palavra-chave</label>
+        <input type="text" class="ctrl-input" id="pes-palavra" placeholder="e-Mola, banco...">
+      </div>
+      <div class="control-group">
+        <label class="ctrl-label">Pool</label>
+        <input type="number" class="ctrl-input" id="pes-limite" value="500" min="1">
+      </div>
+      <button class="btn btn-primary" id="pes-carregar">Pesquisar</button>
+    </div>
+    <div id="pes-lista" class="msg-lista"></div>
+  </section>
+
+  <!-- ─── VIEW: BACKUP ─── -->
+  <section class="view" id="view-backup">
+    <div class="backup-card">
+      <div class="backup-icon">⊞</div>
+      <h2 class="backup-title">Backup Completo</h2>
+      <p class="backup-desc">Exporta todas as tuas mensagens para ficheiro.</p>
+      <div class="view-controls" style="justify-content:center;margin-top:1.5rem">
+        <div class="control-group">
+          <label class="ctrl-label">Limite</label>
+          <input type="number" class="ctrl-input" id="bak-limite" value="5000" min="1">
+        </div>
+      </div>
+      <div class="backup-btns">
+        <button class="btn btn-outline" id="bak-txt">Exportar .txt</button>
+        <button class="btn btn-outline" id="bak-json">Exportar .json</button>
+        <button class="btn btn-primary" id="bak-ambos">Exportar Ambos</button>
+      </div>
+      <div id="bak-status" class="backup-status"></div>
+    </div>
+  </section>
+
+  <!-- ─── VIEW: SPAM ─── -->
+  <section class="view" id="view-spam">
+    <div class="view-controls">
+      <div class="control-group">
+        <label class="ctrl-label">Mensagens a analisar</label>
+        <input type="number" class="ctrl-input" id="spam-limite" value="200" min="1">
+      </div>
+      <button class="btn btn-primary btn-danger" id="spam-analisar">
+        <span>⊗</span> Analisar com IA
+      </button>
+    </div>
+
+    <div id="spam-loading" class="loading-block hidden">
+      <div class="loading-spinner"></div>
+      <span class="loading-text">A classificar com Gemini…</span>
+    </div>
+
+    <div id="spam-resultado" class="hidden">
+      <div class="spam-stats" id="spam-stats"></div>
+      <div class="spam-tabs">
+        <button class="stab active" data-tab="spam-msgs">SPAM</button>
+        <button class="stab" data-tab="spam-legitimas">Legítimas</button>
+        <button class="stab" data-tab="spam-incertas">Incertas</button>
+      </div>
+      <div class="stab-content active" id="spam-msgs"></div>
+      <div class="stab-content" id="spam-legitimas"></div>
+      <div class="stab-content" id="spam-incertas"></div>
+    </div>
+  </section>
+
+  <!-- ─── VIEW: CHAT ─── -->
+  <section class="view" id="view-chat">
+    <div class="chat-setup" id="chat-setup">
+      <div class="view-controls">
+        <div class="control-group">
+          <label class="ctrl-label">Mensagens no contexto</label>
+          <input type="number" class="ctrl-input" id="chat-limite" value="100" min="1" max="2000">
+        </div>
+        <div class="control-group">
+          <label class="ctrl-label">Tipo</label>
+          <select class="ctrl-input" id="chat-tipo">
+            <option value="all">Todas</option>
+            <option value="inbox">Inbox</option>
+            <option value="sent">Sent</option>
+          </select>
+        </div>
+        <button class="btn btn-primary" id="chat-iniciar">
+          <span>◐</span> Iniciar Chat
+        </button>
+      </div>
+    </div>
+
+    <div class="chat-container hidden" id="chat-container">
+      <div class="chat-messages" id="chat-messages"></div>
+      <div class="chat-input-bar">
+        <input type="text" class="chat-input" id="chat-input" placeholder="Pergunta sobre as tuas mensagens…">
+        <button class="chat-send" id="chat-send">↑</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ─── VIEW: REMETENTES ─── -->
+  <section class="view" id="view-remetentes">
+    <div class="view-controls">
+      <div class="control-group">
+        <label class="ctrl-label">Mensagens para análise</label>
+        <input type="number" class="ctrl-input" id="rem-limite" value="500" min="1">
+      </div>
+      <button class="btn btn-primary" id="rem-analisar">Analisar</button>
+    </div>
+
+    <div id="rem-resultado" class="hidden">
+      <div class="rem-tabs">
+        <button class="stab active" data-tab="rem-suspeitos">Suspeitos</button>
+        <button class="stab" data-tab="rem-limpos">Limpos</button>
+      </div>
+      <div class="stab-content active" id="rem-suspeitos"></div>
+      <div class="stab-content" id="rem-limpos"></div>
+
+      <div class="rem-ia-section">
+        <button class="btn btn-primary" id="rem-ia-btn">
+          <span>◐</span> Avaliar com Gemini
+        </button>
+        <div class="ia-output markdown-output hidden" id="rem-ia-output"></div>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<!-- ═══ MODAL EXPORTAR ═══ -->
+<div class="modal-backdrop hidden" id="exportModal">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title">Exportar Mensagens</span>
+      <button class="modal-close" id="exportClose">✕</button>
+    </div>
+    <div class="modal-body">
+      <p class="modal-desc" id="exportDesc"></p>
+      <div class="modal-btns">
+        <button class="btn btn-outline" id="exportTxt">Exportar .txt</button>
+        <button class="btn btn-outline" id="exportJson">Exportar .json</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ TOAST ═══ -->
+<div class="toast-container" id="toastContainer"></div>
+
+<script src="/static/js/md.js"></script>
+<script src="/static/js/app.js"></script>
+</body>
+</html>
