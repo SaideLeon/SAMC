@@ -1,0 +1,61 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Ambientes virtuais
+venv/
+env/
+ENV/
+.venv/
+
+# Variáveis de ambiente
+.env
+.env.*
+
+# Arquivos de configuração locais
+instance/
+
+# Logs
+*.log
+
+# Banco de dados
+*.db
+*.sqlite
+*.sqlite3
+
+# Cache e testes
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.cache/
+
+# Arquivos gerados pelo Flask
+flask_session/
+
+# VS Code
+.vscode/
+
+# PyCharm
+.idea/
+
+# Sistema operacional
+.DS_Store
+Thumbs.db
+
+# Build e distribuição
+build/
+dist/
+*.egg-info/
+
+# Arquivos temporários
+*.tmp
+*.swp
+
+# Arquivos de upload (opcional)
+uploads/
+media/
+
+# Cloudflare Tunnel (opcional)
+cloudflared.log
