@@ -291,18 +291,60 @@ $('#rec-carregar').addEventListener('click', async () => {
    VIEW: CONTACTO
    ════════════════════════════════════════════════════ */
 
+// Contexto de exportação específico da view Contacto
+let _conExportContext = null;
+
 $('#con-carregar').addEventListener('click', async () => {
   const btn      = $('#con-carregar');
   const endereco = $('#con-endereco').value.trim();
   const limite   = +$('#con-limite').value || 100;
   if (!endereco) { toast('Insere um número ou nome', 'error'); return; }
   setLoading(btn, true);
+
+  // Esconde a barra de export enquanto carrega nova pesquisa
+  $('#con-export').classList.add('hidden');
+  _conExportContext = null;
+
   try {
     const r = await fetch(`/api/mensagens?limite=${limite}&endereco=${encodeURIComponent(endereco)}`);
     const d = await r.json();
     renderMsgs(d.mensagens, 'con-lista');
+
+    if (d.mensagens && d.mensagens.length > 0) {
+      // Guarda contexto para os botões de exportar
+      _conExportContext = { mensagens: d.mensagens, titulo: `SMS — ${endereco}` };
+
+      // Actualiza a legenda e mostra a barra
+      $('#con-export-info').textContent =
+        `${d.mensagens.length} mensagem(ns) de "${endereco}"`;
+      $('#con-export').classList.remove('hidden');
+    }
   } catch { toast('Erro ao carregar', 'error'); }
   setLoading(btn, false);
+});
+
+// Botão Exportar .txt na view Contacto
+$('#con-export-txt').addEventListener('click', async () => {
+  if (!_conExportContext) return;
+  const endereco = $('#con-endereco').value.trim() || 'contacto';
+  const ts = new Date().toISOString().slice(0, 10);
+  await downloadViaApi(
+    '/api/export/txt',
+    { mensagens: _conExportContext.mensagens, titulo: _conExportContext.titulo },
+    `sms_${endereco}_${ts}.txt`
+  );
+});
+
+// Botão Exportar .json na view Contacto
+$('#con-export-json').addEventListener('click', async () => {
+  if (!_conExportContext) return;
+  const endereco = $('#con-endereco').value.trim() || 'contacto';
+  const ts = new Date().toISOString().slice(0, 10);
+  await downloadViaApi(
+    '/api/export/json',
+    { mensagens: _conExportContext.mensagens },
+    `sms_${endereco}_${ts}.json`
+  );
 });
 
 /* ════════════════════════════════════════════════════
@@ -591,3 +633,4 @@ $('#rem-ia-btn').addEventListener('click', async () => {
 checkStatus();
 activateView('recentes');
 setTimeout(() => $('#rec-carregar').click(), 300);
+/* fim */
