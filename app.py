@@ -352,6 +352,21 @@ def api_sms_enviar():
 def api_status():
     return jsonify({"gemini": bool(gemini_key()), "termux": True})
 
+# ─── PWA ─────────────────────────────────────────────────────────────────────
+
+@app.route("/sw.js")
+def pwa_sw():
+    return app.send_static_file("js/sw.js"), 200, {
+        "Content-Type": "application/javascript",
+        "Cache-Control": "no-cache, no-store, must-revalidate",
+    }
+
+@app.route("/manifest.json")
+def pwa_manifest():
+    return app.send_static_file("manifest.json"), 200, {
+        "Content-Type": "application/manifest+json",
+    }
+    
 if __name__ == "__main__":
     print("\n  SAMC — Sistema de Análise de Mensagens Curtas — a iniciar em http://localhost:5000\n")
     app.run(host="0.0.0.0", port=5000, debug=False, threaded=True)

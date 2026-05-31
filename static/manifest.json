@@ -1,0 +1,28 @@
+{
+  "name": "SAMC — Sistema de Análise de Mensagens Curtas",
+  "short_name": "SAMC",
+  "description": "Análise, classificação e gestão de SMS com IA Gemini",
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#080b0f",
+  "theme_color": "#00d4ff",
+  "lang": "pt",
+  "scope": "/",
+  "icons": [
+    {
+      "src": "/static/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/static/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["utilities", "productivity"],
+  "screenshots": []
+}
