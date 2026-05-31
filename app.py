@@ -21,7 +21,7 @@ app.secret_key = os.urandom(24)
 
 # ─── Config ──────────────────────────────────────────────────────────────────
 
-GEMINI_MODEL = "gemini-3.1-flash-lite"
+GEMINI_MODEL = "gemini-2.5-flash-lite"
 GEMINI_BASE  = "https://generativelanguage.googleapis.com/v1beta/models"
 
 PALAVRAS_SPAM = [
@@ -342,6 +342,57 @@ def api_export_json():
         mimetype="application/json",
         headers={"Content-Disposition": "attachment; filename=sms_export.json"},
     )
+
+# ─── API: Enviar SMS ──────────────────────────────────────────────────────────
+
+@app.route("/api/sms/enviar", methods=["POST"])
+def api_sms_enviar():
+    data   = request.json or {}
+    numero = (data.get("numero") or "").strip()
+    corpo  = (data.get("corpo") or "").strip()
+
+    if not numero:
+        return jsonify({"ok": False, "erro": "Número em falta"}), 400
+    if not corpo:
+        return jsonify({"ok": False, "erro": "Mensagem em falta"}), 400
+    if len(corpo) > 160:
+        return jsonify({"ok": False, "erro": f"Mensagem demasiado longa ({len(corpo)}/160 chars)"}), 400
+
+    try:
+        result = subprocess.run(
+            ["termux-sms-send", "-n", numero, corpo],
+            capture_output=True, text=True, timeout=30
+        )
+        if result.returncode == 0:
+            return jsonify({"ok": True, "mensagem": f"SMS enviado para {numero}"})
+        else:
+            err = result.stderr.strip() or "Erro desconhecido"
+            return jsonify({"ok": False, "erro": err}), 500
+    except subprocess.TimeoutExpired:
+        return jsonify({"ok": False, "erro": "Timeout ao enviar"}), 500
+    except FileNotFoundError:
+        return jsonify({"ok": False, "erro": "termux-sms-send não encontrado"}), 500
+    except Exception as e:
+        return jsonify({"ok": False, "erro": str(e)}), 500
+
+# ─── API: Contactos ───────────────────────────────────────────────────────────
+
+@app.route("/api/contactos")
+def api_contactos():
+    """Extrai contactos únicos das mensagens recebidas/enviadas."""
+    limite = int(request.args.get("limite", 500))
+    msgs   = get_sms(limite=limite)
+    vistos = {}
+    for msg in msgs:
+        rem = remetente(msg)
+        if rem and rem != "?" and rem not in vistos:
+            vistos[rem] = {
+                "numero": rem,
+                "ultima": (msg.get("received") or "")[:16],
+                "preview": (msg.get("body") or "")[:60],
+            }
+    lista = sorted(vistos.values(), key=lambda x: x["ultima"], reverse=True)
+    return jsonify({"total": len(lista), "contactos": lista})
 
 # ─── Status ───────────────────────────────────────────────────────────────────
 

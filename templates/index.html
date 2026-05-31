@@ -7,6 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/static/css/style.css">
+<link rel="stylesheet" href="/static/css/enviar.css">
 </head>
 <body>
 
@@ -53,6 +54,13 @@
       </button>
       <button class="nav-item" data-view="remetentes">
         <span class="nav-icon">◑</span> Remetentes
+      </button>
+    </div>
+
+    <div class="nav-group">
+      <div class="nav-label">ENVIAR</div>
+      <button class="nav-item" data-view="enviar">
+        <span class="nav-icon">▶</span> Enviar SMS
       </button>
     </div>
   </nav>
@@ -250,6 +258,103 @@
     </div>
   </section>
 
+  <!-- ─── VIEW: ENVIAR SMS ─── -->
+  <section class="view" id="view-enviar">
+
+    <!-- Painel principal: dois blocos lado a lado em desktop, empilhados em mobile -->
+    <div class="enviar-layout">
+
+      <!-- Bloco Esquerdo: Selecção de contacto -->
+      <div class="enviar-contactos-panel">
+        <div class="panel-header">
+          <span class="panel-label">CONTACTOS</span>
+          <button class="btn-icon" id="env-refresh-btn" title="Actualizar lista">↺</button>
+        </div>
+
+        <div class="env-search-wrap">
+          <input
+            type="text"
+            class="ctrl-input env-search"
+            id="env-search"
+            placeholder="Filtrar ou digitar número…"
+            autocomplete="off"
+          >
+        </div>
+
+        <div class="env-contact-list" id="env-contact-list">
+          <div class="loading-block">
+            <div class="loading-spinner"></div>
+            <span class="loading-text">A carregar contactos…</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Bloco Direito: Composição e envio -->
+      <div class="enviar-compose-panel">
+
+        <!-- Destinatário seleccionado -->
+        <div class="env-destinatario-bar" id="env-dest-bar">
+          <span class="env-dest-label">PARA:</span>
+          <span class="env-dest-value" id="env-dest-display">—</span>
+          <button class="env-dest-clear hidden" id="env-dest-clear" title="Limpar">✕</button>
+        </div>
+
+        <!-- Histórico de troca com este contacto -->
+        <div class="env-thread" id="env-thread">
+          <div class="env-thread-empty">
+            <div class="empty-icon">◎</div>
+            <div>Selecciona um contacto para ver o histórico</div>
+          </div>
+        </div>
+
+        <!-- Área de composição -->
+        <div class="env-compose">
+          <div class="env-compose-top">
+            <textarea
+              class="env-textarea"
+              id="env-corpo"
+              placeholder="Escreve a mensagem…"
+              maxlength="160"
+              rows="3"
+            ></textarea>
+            <div class="env-char-count">
+              <span id="env-char-num">0</span>/160
+            </div>
+          </div>
+          <div class="env-compose-actions">
+            <button class="btn btn-primary env-send-btn" id="env-send-btn" disabled>
+              <span>▶</span> Enviar SMS
+            </button>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- Modal de confirmação de envio -->
+    <div class="modal-backdrop hidden" id="env-confirm-modal">
+      <div class="modal">
+        <div class="modal-header">
+          <span class="modal-title">Confirmar Envio</span>
+          <button class="modal-close" id="env-confirm-close">✕</button>
+        </div>
+        <div class="modal-body">
+          <p class="modal-desc">
+            Enviar SMS para <strong id="env-confirm-numero"></strong>?
+          </p>
+          <div class="env-confirm-preview" id="env-confirm-preview"></div>
+          <div class="modal-btns" style="margin-top:1rem">
+            <button class="btn btn-outline" id="env-confirm-cancel">Cancelar</button>
+            <button class="btn btn-primary" id="env-confirm-ok">
+              <span>▶</span> Confirmar
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </section>
+
 </main>
 
 <!-- ═══ MODAL EXPORTAR ═══ -->
@@ -274,5 +379,6 @@
 
 <script src="/static/js/md.js"></script>
 <script src="/static/js/app.js"></script>
+<script src="/static/js/enviar.js"></script>
 </body>
 </html>
