@@ -77,7 +77,6 @@
 <!-- ═══ MAIN ═══ -->
 <main class="main">
 
-  <!-- Topbar -->
   <header class="topbar">
     <button class="menu-btn" id="menuBtn">☰</button>
     <h1 class="topbar-title" id="topbarTitle">Recentes</h1>
@@ -181,12 +180,10 @@
         <span>⊗</span> Analisar com IA
       </button>
     </div>
-
     <div id="spam-loading" class="loading-block hidden">
       <div class="loading-spinner"></div>
       <span class="loading-text">A classificar com Gemini…</span>
     </div>
-
     <div id="spam-resultado" class="hidden">
       <div class="spam-stats" id="spam-stats"></div>
       <div class="spam-tabs">
@@ -221,7 +218,6 @@
         </button>
       </div>
     </div>
-
     <div class="chat-container hidden" id="chat-container">
       <div class="chat-messages" id="chat-messages"></div>
       <div class="chat-input-bar">
@@ -240,7 +236,6 @@
       </div>
       <button class="btn btn-primary" id="rem-analisar">Analisar</button>
     </div>
-
     <div id="rem-resultado" class="hidden">
       <div class="rem-tabs">
         <button class="stab active" data-tab="rem-suspeitos">Suspeitos</button>
@@ -248,7 +243,6 @@
       </div>
       <div class="stab-content active" id="rem-suspeitos"></div>
       <div class="stab-content" id="rem-limpos"></div>
-
       <div class="rem-ia-section">
         <button class="btn btn-primary" id="rem-ia-btn">
           <span>◐</span> Avaliar com Gemini
@@ -261,77 +255,58 @@
   <!-- ─── VIEW: ENVIAR SMS ─── -->
   <section class="view" id="view-enviar">
 
-    <!-- Painel principal: dois blocos lado a lado em desktop, empilhados em mobile -->
-    <div class="enviar-layout">
-
-      <!-- Bloco Esquerdo: Selecção de contacto -->
-      <div class="enviar-contactos-panel">
-        <div class="panel-header">
-          <span class="panel-label">CONTACTOS</span>
-          <button class="btn-icon" id="env-refresh-btn" title="Actualizar lista">↺</button>
-        </div>
-
-        <div class="env-search-wrap">
-          <input
-            type="text"
-            class="ctrl-input env-search"
-            id="env-search"
-            placeholder="Filtrar ou digitar número…"
-            autocomplete="off"
-          >
-        </div>
-
-        <div class="env-contact-list" id="env-contact-list">
-          <div class="loading-block">
-            <div class="loading-spinner"></div>
-            <span class="loading-text">A carregar contactos…</span>
-          </div>
-        </div>
+    <!-- 1. Pesquisa de mensagens para obter o número -->
+    <div class="view-controls">
+      <div class="control-group env-search-group">
+        <label class="ctrl-label">Pesquisar mensagem para obter número</label>
+        <input
+          type="text"
+          class="ctrl-input"
+          id="env-pesquisa"
+          placeholder="Ex: e-Mola, banco, OTP, vizinho…"
+          autocomplete="off"
+        >
       </div>
+      <div class="control-group">
+        <label class="ctrl-label">Pool</label>
+        <input type="number" class="ctrl-input env-pool-input" id="env-pool" value="500" min="1">
+      </div>
+      <button class="btn btn-primary" id="env-pesquisar-btn">Pesquisar</button>
+    </div>
 
-      <!-- Bloco Direito: Composição e envio -->
-      <div class="enviar-compose-panel">
+    <!-- 2. Barra do número seleccionado -->
+    <div class="env-dest-bar hidden" id="env-dest-bar">
+      <span class="env-dest-label">PARA:</span>
+      <span class="env-dest-numero" id="env-dest-numero">—</span>
+      <button class="env-dest-clear" id="env-dest-clear">✕ limpar</button>
+    </div>
 
-        <!-- Destinatário seleccionado -->
-        <div class="env-destinatario-bar" id="env-dest-bar">
-          <span class="env-dest-label">PARA:</span>
-          <span class="env-dest-value" id="env-dest-display">—</span>
-          <button class="env-dest-clear hidden" id="env-dest-clear" title="Limpar">✕</button>
+    <!-- 3. Área de composição -->
+    <div class="env-compose-box">
+      <div class="env-compose-header">MENSAGEM A ENVIAR</div>
+      <div class="env-compose-inner">
+        <textarea
+          class="env-textarea"
+          id="env-corpo"
+          placeholder="Escreve o SMS aqui… (máx. 160 caracteres)"
+          maxlength="160"
+          rows="3"
+        ></textarea>
+        <div class="env-compose-footer">
+          <span class="env-char-count" id="env-char-count">
+            <span id="env-char-num">0</span>/160
+          </span>
+          <button class="btn btn-primary" id="env-send-btn" disabled>
+            <span>▶</span> Enviar SMS
+          </button>
         </div>
-
-        <!-- Histórico de troca com este contacto -->
-        <div class="env-thread" id="env-thread">
-          <div class="env-thread-empty">
-            <div class="empty-icon">◎</div>
-            <div>Selecciona um contacto para ver o histórico</div>
-          </div>
-        </div>
-
-        <!-- Área de composição -->
-        <div class="env-compose">
-          <div class="env-compose-top">
-            <textarea
-              class="env-textarea"
-              id="env-corpo"
-              placeholder="Escreve a mensagem…"
-              maxlength="160"
-              rows="3"
-            ></textarea>
-            <div class="env-char-count">
-              <span id="env-char-num">0</span>/160
-            </div>
-          </div>
-          <div class="env-compose-actions">
-            <button class="btn btn-primary env-send-btn" id="env-send-btn" disabled>
-              <span>▶</span> Enviar SMS
-            </button>
-          </div>
-        </div>
-
       </div>
     </div>
 
-    <!-- Modal de confirmação de envio -->
+    <!-- 4. Resultados da pesquisa -->
+    <div id="env-resultados" class="msg-lista"></div>
+
+    <!-- Modal de confirmação -->
     <div class="modal-backdrop hidden" id="env-confirm-modal">
       <div class="modal">
         <div class="modal-header">
@@ -346,7 +321,7 @@
           <div class="modal-btns" style="margin-top:1rem">
             <button class="btn btn-outline" id="env-confirm-cancel">Cancelar</button>
             <button class="btn btn-primary" id="env-confirm-ok">
-              <span>▶</span> Confirmar
+              <span>▶</span> Confirmar Envio
             </button>
           </div>
         </div>

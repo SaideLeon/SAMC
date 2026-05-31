@@ -3,18 +3,17 @@ SAMC — Sistema de Análise de Mensagens Curtas — Flask Backend
 Termux + Gemini + SSE streaming
 """
 
-import subprocess, json, os, re
+import subprocess, json, os
 from datetime import datetime
 from collections import Counter
 from flask import Flask, render_template, request, jsonify, Response, stream_with_context
 import requests as _req
 
-# ─── Carregar .env automaticamente ───────────────────────────────────────────
 try:
     from dotenv import load_dotenv
     load_dotenv()
 except ImportError:
-    pass  # python-dotenv não instalado — usa variáveis já exportadas no shell
+    pass
 
 app = Flask(__name__)
 app.secret_key = os.urandom(24)
@@ -53,7 +52,6 @@ def gemini_completar(historico):
         return f"[Erro Gemini: {e}]"
 
 def gemini_stream_sse(historico):
-    """Gerador SSE — yield 'data: ...\n\n' para cada chunk."""
     key = gemini_key()
     if not key:
         yield "data: [Erro: GEMINI_API_KEY não definida]\n\n"
@@ -95,9 +93,7 @@ def get_sms(limite=50, tipo="all", endereco=None):
         result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
         if not result.stdout.strip():
             return []
-        msgs = json.loads(result.stdout)
-        # Inverter: mais recente primeiro
-        return list(reversed(msgs))
+        return list(reversed(json.loads(result.stdout)))
     except Exception:
         return []
 
@@ -179,11 +175,9 @@ def api_mensagens():
     tipo     = request.args.get("tipo", "all")
     endereco = request.args.get("endereco") or None
     palavra  = request.args.get("pesquisa") or None
-
     msgs = get_sms(limite=limite, tipo=tipo, endereco=endereco)
     if palavra:
         msgs = pesquisar_msgs(msgs, palavra)
-
     return jsonify({"total": len(msgs), "mensagens": msgs})
 
 # ─── API: Spam ────────────────────────────────────────────────────────────────
@@ -194,34 +188,26 @@ def api_spam():
     limite = int(data.get("limite", 200))
     msgs   = get_sms(limite=limite)
 
-    suspeitas_idx = [i for i, m in enumerate(msgs) if spam_heuristico(m.get("body", ""))]
-    outras_idx    = [i for i in range(len(msgs)) if i not in suspeitas_idx]
-
+    suspeitas_idx  = [i for i, m in enumerate(msgs) if spam_heuristico(m.get("body", ""))]
+    outras_idx     = [i for i in range(len(msgs)) if i not in suspeitas_idx]
     suspeitas_msgs = [msgs[i] for i in suspeitas_idx]
-    BATCH = 20
     classificacoes = {}
 
-    for start in range(0, len(suspeitas_msgs), BATCH):
-        batch      = suspeitas_msgs[start:start + BATCH]
-        resultados = classificar_batch_gemini(batch)
-        for r in resultados:
+    for start in range(0, len(suspeitas_msgs), 20):
+        batch = suspeitas_msgs[start:start + 20]
+        for r in classificar_batch_gemini(batch):
             lid = r.get("id", -1)
             if 0 <= lid < len(batch):
-                gid = suspeitas_idx[start + lid]
-                classificacoes[gid] = r.get("classificacao", "suspeito")
+                classificacoes[suspeitas_idx[start + lid]] = r.get("classificacao", "suspeito")
 
     for i in outras_idx:
         classificacoes[i] = "legitimo"
 
-    spam_list = [msgs[i] for i in range(len(msgs)) if classificacoes.get(i) == "spam"]
-    legitimas = [msgs[i] for i in range(len(msgs)) if classificacoes.get(i) == "legitimo"]
-    incertas  = [msgs[i] for i in range(len(msgs)) if classificacoes.get(i) not in ("spam", "legitimo")]
-
     return jsonify({
         "total":     len(msgs),
-        "spam":      spam_list,
-        "legitimas": legitimas,
-        "incertas":  incertas,
+        "spam":      [msgs[i] for i in range(len(msgs)) if classificacoes.get(i) == "spam"],
+        "legitimas": [msgs[i] for i in range(len(msgs)) if classificacoes.get(i) == "legitimo"],
+        "incertas":  [msgs[i] for i in range(len(msgs)) if classificacoes.get(i) not in ("spam", "legitimo")],
     })
 
 # ─── API: Remetentes ──────────────────────────────────────────────────────────
@@ -230,18 +216,16 @@ def api_spam():
 def api_remetentes():
     limite = int(request.args.get("limite", 500))
     msgs   = get_sms(limite=limite)
-    dados  = analisar_remetentes(msgs)
-    return jsonify({"total_msgs": len(msgs), "remetentes": dados})
+    return jsonify({"total_msgs": len(msgs), "remetentes": analisar_remetentes(msgs)})
 
 # ─── API: Chat SSE ────────────────────────────────────────────────────────────
 
 @app.route("/api/chat/resumo", methods=["POST"])
 def api_chat_resumo():
-    data   = request.json or {}
-    limite = int(data.get("limite", 100))
-    tipo   = data.get("tipo", "all")
-    msgs   = get_sms(limite=limite, tipo=tipo)
-
+    data    = request.json or {}
+    limite  = int(data.get("limite", 100))
+    tipo    = data.get("tipo", "all")
+    msgs    = get_sms(limite=limite, tipo=tipo)
     contexto = construir_contexto(msgs)
     sistema  = (
         f"Tens acesso a {len(msgs)} SMS do utilizador. "
@@ -249,16 +233,10 @@ def api_chat_resumo():
         "# cabeçalhos, **negrito**, - listas, > citações. "
         "Sê conciso e claro.\n\nMENSAGENS:\n" + contexto
     )
-    pergunta = "Faz um resumo: quantas mensagens há, principais remetentes e temas."
     historico = [
         gemini_msg("user", sistema),
-        gemini_msg("user", pergunta),
+        gemini_msg("user", "Faz um resumo: quantas mensagens há, principais remetentes e temas."),
     ]
-
-    ctx_path = os.path.join(os.path.expanduser("~"), "sms_chat_ctx.json")
-    with open(ctx_path, "w") as f:
-        json.dump({"sistema": sistema, "historico": []}, f)
-
     return Response(
         stream_with_context(gemini_stream_sse(historico)),
         content_type="text/event-stream",
@@ -271,18 +249,14 @@ def api_chat_perguntar():
     pergunta  = data.get("pergunta", "")
     historico = data.get("historico", [])
     sistema   = data.get("sistema", "")
-
     msgs_gemini = []
     if sistema:
         msgs_gemini.append(gemini_msg("user", sistema))
         msgs_gemini.append(gemini_msg("model", "Entendido. Estou pronto para analisar as mensagens."))
-
     for h in historico:
         role = "model" if h["role"] == "assistant" else "user"
         msgs_gemini.append(gemini_msg(role, h["content"]))
-
     msgs_gemini.append(gemini_msg("user", pergunta))
-
     return Response(
         stream_with_context(gemini_stream_sse(msgs_gemini)),
         content_type="text/event-stream",
@@ -302,9 +276,8 @@ def api_remetentes_ia():
         "Indica quais são mais provavelmente spam, golpe ou marketing agressivo "
         "e dá uma recomendação breve por remetente. Usa Markdown.\n\n" + lista_txt
     )
-    historico = [gemini_msg("user", pergunta)]
     return Response(
-        stream_with_context(gemini_stream_sse(historico)),
+        stream_with_context(gemini_stream_sse([gemini_msg("user", pergunta)])),
         content_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
     )
@@ -313,8 +286,8 @@ def api_remetentes_ia():
 
 @app.route("/api/export/txt", methods=["POST"])
 def api_export_txt():
-    data  = request.json or {}
-    msgs  = data.get("mensagens", [])
+    data   = request.json or {}
+    msgs   = data.get("mensagens", [])
     titulo = data.get("titulo", "")
     linhas = [f"SMS Export — {datetime.now().strftime('%d/%m/%Y %H:%M:%S')}"]
     if titulo:
@@ -330,13 +303,12 @@ def api_export_txt():
     return Response(
         "\n".join(linhas),
         mimetype="text/plain",
-        headers={"Content-Disposition": f"attachment; filename=sms_export.txt"},
+        headers={"Content-Disposition": "attachment; filename=sms_export.txt"},
     )
 
 @app.route("/api/export/json", methods=["POST"])
 def api_export_json():
-    data = request.json or {}
-    msgs = data.get("mensagens", [])
+    msgs = (request.json or {}).get("mensagens", [])
     return Response(
         json.dumps(msgs, ensure_ascii=False, indent=2),
         mimetype="application/json",
@@ -365,43 +337,20 @@ def api_sms_enviar():
         )
         if result.returncode == 0:
             return jsonify({"ok": True, "mensagem": f"SMS enviado para {numero}"})
-        else:
-            err = result.stderr.strip() or "Erro desconhecido"
-            return jsonify({"ok": False, "erro": err}), 500
+        err = result.stderr.strip() or "Erro desconhecido"
+        return jsonify({"ok": False, "erro": err}), 500
     except subprocess.TimeoutExpired:
         return jsonify({"ok": False, "erro": "Timeout ao enviar"}), 500
     except FileNotFoundError:
-        return jsonify({"ok": False, "erro": "termux-sms-send não encontrado"}), 500
+        return jsonify({"ok": False, "erro": "termux-sms-send não encontrado. Instala o pacote termux-api."}), 500
     except Exception as e:
         return jsonify({"ok": False, "erro": str(e)}), 500
-
-# ─── API: Contactos ───────────────────────────────────────────────────────────
-
-@app.route("/api/contactos")
-def api_contactos():
-    """Extrai contactos únicos das mensagens recebidas/enviadas."""
-    limite = int(request.args.get("limite", 500))
-    msgs   = get_sms(limite=limite)
-    vistos = {}
-    for msg in msgs:
-        rem = remetente(msg)
-        if rem and rem != "?" and rem not in vistos:
-            vistos[rem] = {
-                "numero": rem,
-                "ultima": (msg.get("received") or "")[:16],
-                "preview": (msg.get("body") or "")[:60],
-            }
-    lista = sorted(vistos.values(), key=lambda x: x["ultima"], reverse=True)
-    return jsonify({"total": len(lista), "contactos": lista})
 
 # ─── Status ───────────────────────────────────────────────────────────────────
 
 @app.route("/api/status")
 def api_status():
-    return jsonify({
-        "gemini": bool(gemini_key()),
-        "termux": True,
-    })
+    return jsonify({"gemini": bool(gemini_key()), "termux": True})
 
 if __name__ == "__main__":
     print("\n  SAMC — Sistema de Análise de Mensagens Curtas — a iniciar em http://localhost:5000\n")

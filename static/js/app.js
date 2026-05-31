@@ -23,8 +23,8 @@ function fmt_data(str) {
   if (!str) return '—';
   const d = new Date(str);
   if (isNaN(d)) return str.slice(0, 16);
-  return d.toLocaleDateString('pt', { day:'2-digit', month:'2-digit' }) +
-         ' ' + d.toLocaleTimeString('pt', { hour:'2-digit', minute:'2-digit' });
+  return d.toLocaleDateString('pt', { day: '2-digit', month: '2-digit' }) +
+         ' ' + d.toLocaleTimeString('pt', { hour: '2-digit', minute: '2-digit' });
 }
 
 function fmt_rem(msg) {
@@ -33,11 +33,6 @@ function fmt_rem(msg) {
 
 /* ─── SSE helper ─────────────────────────────────── */
 
-/**
- * Consome um endpoint SSE, acumula chunks e chama callbacks.
- * onChunk(texto_acumulado) — chamado a cada chunk
- * onDone(texto_final)       — chamado quando termina
- */
 async function consumeSSE(url, body, onChunk, onDone) {
   const resp = await fetch(url, {
     method: 'POST',
@@ -97,8 +92,21 @@ async function downloadViaApi(endpoint, payload, filename) {
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
     toast(`${filename} descarregado`);
-  } catch (e) {
+  } catch {
     toast('Erro ao exportar', 'error');
+  }
+}
+
+/* ─── Loading state helper ───────────────────────── */
+
+function setLoading(btnEl, sim) {
+  if (sim) {
+    btnEl._origText = btnEl.innerHTML;
+    btnEl.innerHTML = '<div class="loading-spinner" style="width:14px;height:14px;border-width:2px"></div>';
+    btnEl.disabled = true;
+  } else {
+    btnEl.innerHTML = btnEl._origText || btnEl.innerHTML;
+    btnEl.disabled = false;
   }
 }
 
@@ -132,6 +140,7 @@ const VIEW_LABELS = {
   spam:       'Anti-Spam · IA',
   chat:       'Chat com IA',
   remetentes: 'Remetentes Suspeitos',
+  enviar:     'Enviar SMS',
 };
 
 function activateView(nome) {
@@ -154,8 +163,8 @@ async function checkStatus() {
   try {
     const r = await fetch('/api/status');
     const d = await r.json();
-    const dot  = $('#statusDotGemini');
-    const txt  = $('#statusTextGemini');
+    const dot = $('#statusDotGemini');
+    const txt = $('#statusTextGemini');
     if (d.gemini) {
       dot.className = 'status-dot ok';
       txt.textContent = 'Gemini ativo';
@@ -170,11 +179,9 @@ async function checkStatus() {
    COMPONENTES
    ════════════════════════════════════════════════════ */
 
-/* ─── Renderizar lista de mensagens ──────────────── */
-
 let _exportContext = null;
 
-function renderMsgs(msgs, containerId, {badges = {}, showExport = true} = {}) {
+function renderMsgs(msgs, containerId, { badges = {}, showExport = true } = {}) {
   const el = $(`#${containerId}`);
   if (!msgs.length) {
     el.innerHTML = `<div class="empty-state"><div class="empty-icon">◉</div>Nenhuma mensagem encontrada</div>`;
@@ -190,9 +197,9 @@ function renderMsgs(msgs, containerId, {badges = {}, showExport = true} = {}) {
     const tag   = badges[i];
 
     let badgeHtml = '';
-    if (tag === 'SPAM')      badgeHtml = '<span class="badge badge-red">SPAM</span>';
-    else if (tag === 'OK')   badgeHtml = '<span class="badge badge-green">OK</span>';
-    else if (tag === '?')    badgeHtml = '<span class="badge badge-yellow">?</span>';
+    if (tag === 'SPAM')    badgeHtml = '<span class="badge badge-red">SPAM</span>';
+    else if (tag === 'OK') badgeHtml = '<span class="badge badge-green">OK</span>';
+    else if (tag === '?')  badgeHtml = '<span class="badge badge-yellow">?</span>';
 
     const card = document.createElement('div');
     card.className = `msg-card${tag ? ' ' + (tag === 'SPAM' ? 'spam' : tag === 'OK' ? 'legitimo' : 'suspeito') : ''}`;
@@ -202,7 +209,7 @@ function renderMsgs(msgs, containerId, {badges = {}, showExport = true} = {}) {
         ${badgeHtml}
         <span class="msg-date">${data}</span>
       </div>
-      <div class="msg-body">${corpo.replace(/</g,'&lt;')}</div>
+      <div class="msg-body">${corpo.replace(/</g, '&lt;')}</div>
       ${showExport ? `<button class="msg-export-btn" data-idx="${i}">⊞ exportar</button>` : ''}
     `;
 
@@ -232,7 +239,6 @@ function setupTabs(containerSel) {
       $$('.stab', group).forEach(b => b.classList.remove('active'));
       btn.classList.add('active');
       const tabId = btn.dataset.tab;
-      // esconder todos os stab-content do mesmo nível
       const parent = group.parentElement;
       $$('.stab-content', parent).forEach(c => c.classList.remove('active'));
       $(`#${tabId}`)?.classList.add('active');
@@ -264,19 +270,6 @@ $('#exportJson').addEventListener('click', async () => {
   await downloadViaApi('/api/export/json', _exportContext, 'sms_export.json');
   $('#exportModal').classList.add('hidden');
 });
-
-/* ─── Loading state helper ───────────────────────── */
-
-function setLoading(btnEl, sim) {
-  if (sim) {
-    btnEl._origText = btnEl.innerHTML;
-    btnEl.innerHTML = '<div class="loading-spinner" style="width:14px;height:14px;border-width:2px"></div>';
-    btnEl.disabled = true;
-  } else {
-    btnEl.innerHTML = btnEl._origText || btnEl.innerHTML;
-    btnEl.disabled = false;
-  }
-}
 
 /* ════════════════════════════════════════════════════
    VIEW: RECENTES
@@ -334,7 +327,7 @@ $('#tip-carregar').addEventListener('click', async () => {
    ════════════════════════════════════════════════════ */
 
 $('#pes-carregar').addEventListener('click', async () => {
-  const btn    = $('#pes-carregar');
+  const btn     = $('#pes-carregar');
   const palavra = $('#pes-palavra').value.trim();
   const limite  = +$('#pes-limite').value || 500;
   if (!palavra) { toast('Insere uma palavra-chave', 'error'); return; }
@@ -361,13 +354,11 @@ async function fazerBackup(fmt) {
   try {
     const r = await fetch(`/api/mensagens?limite=${limite}`);
     const d = await r.json();
-    const ts = new Date().toISOString().slice(0,10);
-    if (fmt === 'txt' || fmt === 'ambos') {
+    const ts = new Date().toISOString().slice(0, 10);
+    if (fmt === 'txt' || fmt === 'ambos')
       await downloadViaApi('/api/export/txt', { mensagens: d.mensagens, titulo: 'Backup Completo' }, `sms_backup_${ts}.txt`);
-    }
-    if (fmt === 'json' || fmt === 'ambos') {
+    if (fmt === 'json' || fmt === 'ambos')
       await downloadViaApi('/api/export/json', { mensagens: d.mensagens }, `sms_backup_${ts}.json`);
-    }
     $('#bak-status').textContent = `✓ ${d.total} mensagens exportadas`;
   } catch {
     $('#bak-status').textContent = '✗ Erro ao exportar';
@@ -381,8 +372,6 @@ $('#bak-ambos').addEventListener('click', () => fazerBackup('ambos'));
 /* ════════════════════════════════════════════════════
    VIEW: SPAM
    ════════════════════════════════════════════════════ */
-
-let _spamData = null;
 
 $('#spam-analisar').addEventListener('click', async () => {
   const btn    = $('#spam-analisar');
@@ -398,38 +387,23 @@ $('#spam-analisar').addEventListener('click', async () => {
       body: JSON.stringify({ limite }),
     });
     const d = await r.json();
-    _spamData = d;
 
-    // Stats
     $('#spam-stats').innerHTML = `
-      <div class="stat-card">
-        <div class="stat-num cyan">${d.total}</div>
-        <div class="stat-label">Total</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-num red">${d.spam.length}</div>
-        <div class="stat-label">SPAM</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-num green">${d.legitimas.length}</div>
-        <div class="stat-label">Legítimas</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-num yellow">${d.incertas.length}</div>
-        <div class="stat-label">Incertas</div>
-      </div>
+      <div class="stat-card"><div class="stat-num cyan">${d.total}</div><div class="stat-label">Total</div></div>
+      <div class="stat-card"><div class="stat-num red">${d.spam.length}</div><div class="stat-label">SPAM</div></div>
+      <div class="stat-card"><div class="stat-num green">${d.legitimas.length}</div><div class="stat-label">Legítimas</div></div>
+      <div class="stat-card"><div class="stat-num yellow">${d.incertas.length}</div><div class="stat-label">Incertas</div></div>
     `;
 
-    renderMsgs(d.spam,      'spam-msgs',      { badges: Object.fromEntries(d.spam.map((_,i)=>[i,'SPAM'])) });
-    renderMsgs(d.legitimas, 'spam-legitimas', { badges: Object.fromEntries(d.legitimas.map((_,i)=>[i,'OK'])) });
-    renderMsgs(d.incertas,  'spam-incertas',  { badges: Object.fromEntries(d.incertas.map((_,i)=>[i,'?'])) });
+    renderMsgs(d.spam,      'spam-msgs',      { badges: Object.fromEntries(d.spam.map((_, i) => [i, 'SPAM'])) });
+    renderMsgs(d.legitimas, 'spam-legitimas', { badges: Object.fromEntries(d.legitimas.map((_, i) => [i, 'OK'])) });
+    renderMsgs(d.incertas,  'spam-incertas',  { badges: Object.fromEntries(d.incertas.map((_, i) => [i, '?'])) });
 
     setupTabs('#view-spam');
-
     $('#spam-loading').classList.add('hidden');
     $('#spam-resultado').classList.remove('hidden');
     toast(`Análise completa: ${d.spam.length} SPAM detectados`);
-  } catch (e) {
+  } catch {
     toast('Erro na análise', 'error');
     $('#spam-loading').classList.add('hidden');
   }
@@ -440,9 +414,9 @@ $('#spam-analisar').addEventListener('click', async () => {
    VIEW: CHAT IA
    ════════════════════════════════════════════════════ */
 
-let _chatSistema  = '';
-let _chatHistorico = [];  // [{role, content}]
-let _chatStreaming = false;
+let _chatSistema   = '';
+let _chatHistorico = [];
+let _chatStreaming  = false;
 
 function addBubble(role, conteudo, streaming = false) {
   const msgs = $('#chat-messages');
@@ -479,9 +453,7 @@ $('#chat-iniciar').addEventListener('click', async () => {
   try {
     $('#chat-messages').innerHTML = '';
     _chatHistorico = [];
-
-    // Buscar sistema do servidor via SSE
-    _chatSistema = `Tens acesso a ${limite} SMS do utilizador. Responde sempre em Português. Usa Markdown.`;
+    _chatSistema   = `Tens acesso a ${limite} SMS do utilizador. Responde sempre em Português. Usa Markdown.`;
 
     const body = addBubble('ai', '', true);
     updateBubble(body, '_A carregar mensagens e gerar resumo…_');
@@ -489,18 +461,18 @@ $('#chat-iniciar').addEventListener('click', async () => {
     await consumeSSE(
       '/api/chat/resumo',
       { limite, tipo },
-      (acum) => { updateBubble(body, acum); },
+      (acum)  => { updateBubble(body, acum); },
       (final) => {
         updateBubble(body, final, true);
         _chatHistorico.push({ role: 'assistant', content: final });
-        _chatSistema = `Tens acesso a SMS do utilizador. Responde em Português. Usa Markdown.`;
+        _chatSistema = 'Tens acesso a SMS do utilizador. Responde em Português. Usa Markdown.';
       }
     );
 
     $('#chat-setup').style.display = 'none';
     $('#chat-container').classList.remove('hidden');
     toast('Chat iniciado com sucesso');
-  } catch (e) {
+  } catch {
     toast('Erro ao iniciar chat', 'error');
   }
   setLoading(btn, false);
@@ -512,7 +484,7 @@ async function enviarPergunta() {
   const pergunta = input.value.trim();
   if (!pergunta) return;
 
-  input.value = '';
+  input.value   = '';
   _chatStreaming = true;
   $('#chat-send').disabled = true;
 
@@ -524,7 +496,7 @@ async function enviarPergunta() {
   await consumeSSE(
     '/api/chat/perguntar',
     { pergunta, historico: _chatHistorico.slice(0, -1), sistema: _chatSistema },
-    (acum) => { updateBubble(body, acum); },
+    (acum)  => { updateBubble(body, acum); },
     (final) => {
       updateBubble(body, final, true);
       _chatHistorico.push({ role: 'assistant', content: final });
@@ -579,13 +551,7 @@ function renderRemTable(lista, id) {
   const RISK_CLASS = { ALTO: 'risk-alto', 'MÉDIO': 'risk-médio', BAIXO: 'risk-baixo' };
   el.innerHTML = `
     <table class="rem-table">
-      <thead>
-        <tr>
-          <th>Remetente</th>
-          <th>Msgs</th>
-          <th>Risco</th>
-        </tr>
-      </thead>
+      <thead><tr><th>Remetente</th><th>Msgs</th><th>Risco</th></tr></thead>
       <tbody>
         ${lista.map(r => `
           <tr>
@@ -611,7 +577,7 @@ $('#rem-ia-btn').addEventListener('click', async () => {
   await consumeSSE(
     '/api/chat/remetentes-ia',
     { suspeitos: _remSuspeitos },
-    (acum) => { MD.render(out, acum); },
+    (acum)  => { MD.render(out, acum); },
     (final) => { MD.render(out, final); }
   );
 
@@ -624,6 +590,4 @@ $('#rem-ia-btn').addEventListener('click', async () => {
 
 checkStatus();
 activateView('recentes');
-
-// Carregar mensagens recentes automaticamente
 setTimeout(() => $('#rec-carregar').click(), 300);

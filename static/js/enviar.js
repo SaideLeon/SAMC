@@ -1,395 +1,230 @@
 /**
  * enviar.js — Painel de Envio de SMS
- * Carrega contactos, selecção, histórico de thread, confirmação e envio.
+ * Fluxo: pesquisar mensagem → clicar para seleccionar número → compor → confirmar → enviar
+ * Usa a mesma API /api/mensagens já existente.
  */
 
-/* ════════════════════════════════════════════════════
-   ESTADO
-   ════════════════════════════════════════════════════ */
+(function () {
 
-const Enviar = (() => {
-  let _contactos   = [];   // lista completa carregada da API
-  let _filtrados   = [];   // lista após filtro de pesquisa
-  let _seleccionado = null; // { numero, ultima, preview }
+  /* ── Estado ─────────────────────────────────────── */
+  let _numeroSeleccionado = null;
 
-  /* ─── Elementos ─────────────────────────────────── */
-  const el = {
-    list:        () => document.getElementById('env-contact-list'),
-    search:      () => document.getElementById('env-search'),
-    refreshBtn:  () => document.getElementById('env-refresh-btn'),
-    destBar:     () => document.getElementById('env-dest-bar'),
-    destDisplay: () => document.getElementById('env-dest-display'),
-    destClear:   () => document.getElementById('env-dest-clear'),
-    thread:      () => document.getElementById('env-thread'),
-    textarea:    () => document.getElementById('env-corpo'),
-    charNum:     () => document.getElementById('env-char-num'),
-    charCount:   () => document.getElementById('env-char-num').parentElement,
-    sendBtn:     () => document.getElementById('env-send-btn'),
-    // modal confirmação
-    confirmModal:  () => document.getElementById('env-confirm-modal'),
-    confirmClose:  () => document.getElementById('env-confirm-close'),
-    confirmCancel: () => document.getElementById('env-confirm-cancel'),
-    confirmOk:     () => document.getElementById('env-confirm-ok'),
-    confirmNumero: () => document.getElementById('env-confirm-numero'),
-    confirmPrev:   () => document.getElementById('env-confirm-preview'),
-  };
+  /* ── Shortcuts ──────────────────────────────────── */
+  const $id = (id) => document.getElementById(id);
 
-  /* ════════════════════════════════════════════════════
-     CONTACTOS
-     ════════════════════════════════════════════════════ */
+  /* ════════════════════════════════════════════════
+     PESQUISA
+  ════════════════════════════════════════════════ */
 
-  async function carregarContactos() {
-    el.list().innerHTML = `
-      <div class="loading-block">
-        <div class="loading-spinner"></div>
-        <span class="loading-text">A carregar contactos…</span>
-      </div>`;
+  async function pesquisar() {
+    const palavra = $id('env-pesquisa').value.trim();
+    const limite  = parseInt($id('env-pool').value) || 500;
 
-    try {
-      const r = await fetch('/api/contactos?limite=500');
-      const d = await r.json();
-      _contactos = d.contactos || [];
-      _filtrados  = _contactos;
-      renderContactos(_contactos);
-    } catch {
-      el.list().innerHTML = `<div class="empty-state">
-        <div class="empty-icon">⊗</div>Erro ao carregar contactos</div>`;
-    }
-  }
-
-  function renderContactos(lista) {
-    const container = el.list();
-
-    if (!lista.length) {
-      container.innerHTML = `<div class="empty-state">
-        <div class="empty-icon">◎</div>Nenhum contacto encontrado</div>`;
+    if (!palavra) {
+      toast('Insere uma palavra-chave', 'error');
       return;
     }
 
-    container.innerHTML = '';
-    lista.forEach(c => {
-      const item = document.createElement('div');
-      item.className = 'env-contact-item';
-      if (_seleccionado && _seleccionado.numero === c.numero) {
-        item.classList.add('selected');
-      }
-      item.dataset.numero = c.numero;
-      item.innerHTML = `
-        <span class="env-contact-num">${escHtml(c.numero)}</span>
-        <span class="env-contact-preview">${escHtml(c.preview || '')}</span>
-        <button class="env-contact-quick-send" data-numero="${escHtml(c.numero)}" title="Envio rápido">▶ enviar</button>
+    const btn = $id('env-pesquisar-btn');
+    setLoading(btn, true);
+
+    $id('env-resultados').innerHTML = `
+      <div class="loading-block">
+        <div class="loading-spinner"></div>
+        <span class="loading-text">A pesquisar…</span>
+      </div>`;
+
+    try {
+      const r = await fetch(`/api/mensagens?limite=${limite}&pesquisa=${encodeURIComponent(palavra)}`);
+      const d = await r.json();
+      renderResultados(d.mensagens || []);
+    } catch {
+      toast('Erro ao pesquisar mensagens', 'error');
+      $id('env-resultados').innerHTML = '';
+    }
+
+    setLoading(btn, false);
+  }
+
+  /* ════════════════════════════════════════════════
+     RENDERIZAR RESULTADOS
+  ════════════════════════════════════════════════ */
+
+  function renderResultados(msgs) {
+    const el = $id('env-resultados');
+
+    if (!msgs.length) {
+      el.innerHTML = `<div class="empty-state"><div class="empty-icon">◎</div>Nenhuma mensagem encontrada</div>`;
+      return;
+    }
+
+    el.innerHTML = `<div class="list-count">${msgs.length} resultado(s) — toca numa mensagem para seleccionar o número</div>`;
+
+    msgs.forEach((msg) => {
+      const numero = msg.sender || msg.address || '?';
+      const data   = fmt_data(msg.received);
+      const corpo  = (msg.body || '').trim();
+      const activo = _numeroSeleccionado === numero;
+
+      const card = document.createElement('div');
+      card.className = `msg-card env-result-card${activo ? ' env-card-selected' : ''}`;
+      card.dataset.numero = numero;
+      card.innerHTML = `
+        <div class="msg-header">
+          <span class="msg-sender">${esc(numero)}</span>
+          <span class="msg-date">${data}</span>
+        </div>
+        <div class="msg-body">${esc(corpo)}</div>
+        <div class="env-select-hint">Toca para usar este número</div>
       `;
 
-      // Seleccionar contacto ao clicar no item
-      item.addEventListener('click', (e) => {
-        if (e.target.classList.contains('env-contact-quick-send')) return;
-        seleccionarContacto(c);
-      });
-
-      // Envio rápido: selecciona e foca no textarea
-      item.querySelector('.env-contact-quick-send').addEventListener('click', (e) => {
-        e.stopPropagation();
-        seleccionarContacto(c);
-        el.textarea().focus();
-      });
-
-      container.appendChild(item);
+      card.addEventListener('click', () => seleccionarNumero(numero));
+      el.appendChild(card);
     });
   }
 
-  function filtrarContactos(query) {
-    const q = query.trim().toLowerCase();
-    if (!q) {
-      _filtrados = _contactos;
-    } else {
-      _filtrados = _contactos.filter(c =>
-        c.numero.toLowerCase().includes(q) ||
-        (c.preview || '').toLowerCase().includes(q)
-      );
-    }
-    renderContactos(_filtrados);
-  }
+  /* ════════════════════════════════════════════════
+     SELECÇÃO DO NÚMERO
+  ════════════════════════════════════════════════ */
 
-  /* ════════════════════════════════════════════════════
-     SELECÇÃO
-     ════════════════════════════════════════════════════ */
+  function seleccionarNumero(numero) {
+    _numeroSeleccionado = numero;
 
-  async function seleccionarContacto(c) {
-    _seleccionado = c;
-
-    // Actualizar UI de lista (highlight)
-    document.querySelectorAll('.env-contact-item').forEach(item => {
-      item.classList.toggle('selected', item.dataset.numero === c.numero);
+    /* highlight no card */
+    document.querySelectorAll('.env-result-card').forEach(c => {
+      c.classList.toggle('env-card-selected', c.dataset.numero === numero);
     });
 
-    // Barra do destinatário
-    el.destDisplay().textContent = c.numero;
-    el.destClear().classList.remove('hidden');
+    /* barra de destino */
+    $id('env-dest-numero').textContent = numero;
+    $id('env-dest-bar').classList.remove('hidden');
 
-    // Actualizar estado do botão de envio
-    actualizarBotaoEnvio();
+    /* focar textarea */
+    $id('env-corpo').focus();
+    actualizarBotao();
 
-    // Carregar histórico (thread)
-    await carregarThread(c.numero);
-
-    // Fechar sidebar em mobile se aberto
-    if (window.innerWidth < 900) {
-      const sb = document.getElementById('sidebar');
-      if (sb) sb.classList.remove('open');
-      const ov = document.getElementById('overlay');
-      if (ov) ov.classList.remove('visible');
-    }
+    toast(`Número seleccionado: ${numero}`);
   }
 
   function limparSeleccao() {
-    _seleccionado = null;
-    el.destDisplay().textContent = '—';
-    el.destClear().classList.add('hidden');
-    el.thread().innerHTML = `
-      <div class="env-thread-empty">
-        <div class="empty-icon">◎</div>
-        <div>Selecciona um contacto para ver o histórico</div>
-      </div>`;
-    document.querySelectorAll('.env-contact-item').forEach(i => i.classList.remove('selected'));
-    actualizarBotaoEnvio();
+    _numeroSeleccionado = null;
+    $id('env-dest-bar').classList.add('hidden');
+    $id('env-dest-numero').textContent = '—';
+    document.querySelectorAll('.env-result-card').forEach(c => {
+      c.classList.remove('env-card-selected');
+    });
+    actualizarBotao();
   }
 
-  /* ════════════════════════════════════════════════════
-     THREAD (histórico com contacto)
-     ════════════════════════════════════════════════════ */
+  /* ════════════════════════════════════════════════
+     COMPOSIÇÃO
+  ════════════════════════════════════════════════ */
 
-  async function carregarThread(numero) {
-    const thread = el.thread();
-    thread.innerHTML = `
-      <div class="loading-block" style="justify-content:center">
-        <div class="loading-spinner"></div>
-        <span class="loading-text">A carregar histórico…</span>
-      </div>`;
-
-    try {
-      // Buscar inbox e sent filtrado pelo número
-      const [rIn, rOut] = await Promise.all([
-        fetch(`/api/mensagens?limite=200&endereco=${encodeURIComponent(numero)}&tipo=inbox`),
-        fetch(`/api/mensagens?limite=200&endereco=${encodeURIComponent(numero)}&tipo=sent`),
-      ]);
-      const [dIn, dOut] = await Promise.all([rIn.json(), rOut.json()]);
-
-      const todas = [
-        ...(dIn.mensagens  || []).map(m => ({ ...m, _dir: 'in'  })),
-        ...(dOut.mensagens || []).map(m => ({ ...m, _dir: 'out' })),
-      ].sort((a, b) => {
-        const ta = new Date(a.received || 0).getTime();
-        const tb = new Date(b.received || 0).getTime();
-        return ta - tb;
-      });
-
-      thread.innerHTML = '';
-
-      if (!todas.length) {
-        thread.innerHTML = `
-          <div class="env-thread-empty">
-            <div class="empty-icon">◎</div>
-            <div>Sem histórico com este contacto</div>
-          </div>`;
-        return;
-      }
-
-      todas.forEach(msg => {
-        const bub = document.createElement('div');
-        bub.className = `env-bubble ${msg._dir === 'out' ? 'env-bubble-out' : 'env-bubble-in'}`;
-        const corpo = escHtml((msg.body || '').trim());
-        const data  = fmtDataThread(msg.received);
-        bub.innerHTML = `
-          <div>${corpo}</div>
-          <div class="env-bubble-meta">${data}</div>
-        `;
-        thread.appendChild(bub);
-      });
-
-      // Scroll para o fundo
-      thread.scrollTop = thread.scrollHeight;
-
-    } catch {
-      thread.innerHTML = `<div class="empty-state">
-        <div class="empty-icon">⊗</div>Erro ao carregar histórico</div>`;
-    }
-  }
-
-  /* ════════════════════════════════════════════════════
-     COMPOSIÇÃO E ENVIO
-     ════════════════════════════════════════════════════ */
-
-  function actualizarBotaoEnvio() {
-    const corpo = (el.textarea().value || '').trim();
-    const temDest = !!_seleccionado;
-    const temCorpo = corpo.length > 0;
-    el.sendBtn().disabled = !(temDest && temCorpo);
+  function actualizarBotao() {
+    const temDest  = !!_numeroSeleccionado;
+    const temCorpo = ($id('env-corpo').value || '').trim().length > 0;
+    $id('env-send-btn').disabled = !(temDest && temCorpo);
   }
 
   function actualizarContador() {
-    const n = el.textarea().value.length;
-    el.charNum().textContent = n;
-    const cc = el.charCount();
+    const n  = ($id('env-corpo').value || '').length;
+    $id('env-char-num').textContent = n;
+    const cc = $id('env-char-count');
     cc.classList.remove('warn', 'danger');
-    if (n >= 150) cc.classList.add('danger');
+    if (n >= 150)      cc.classList.add('danger');
     else if (n >= 120) cc.classList.add('warn');
+    actualizarBotao();
   }
 
+  /* ════════════════════════════════════════════════
+     ENVIO
+  ════════════════════════════════════════════════ */
+
   function abrirConfirmacao() {
-    const corpo  = el.textarea().value.trim();
-    const numero = _seleccionado?.numero || '';
-    el.confirmNumero().textContent = numero;
-    el.confirmPrev().textContent   = corpo;
-    el.confirmModal().classList.remove('hidden');
+    const corpo  = ($id('env-corpo').value || '').trim();
+    const numero = _numeroSeleccionado;
+    if (!corpo || !numero) return;
+
+    $id('env-confirm-numero').textContent  = numero;
+    $id('env-confirm-preview').textContent = corpo;
+    $id('env-confirm-modal').classList.remove('hidden');
   }
 
   function fecharConfirmacao() {
-    el.confirmModal().classList.add('hidden');
+    $id('env-confirm-modal').classList.add('hidden');
   }
 
   async function confirmarEnvio() {
-    const corpo  = el.textarea().value.trim();
-    const numero = _seleccionado?.numero || '';
+    const corpo  = ($id('env-corpo').value || '').trim();
+    const numero = _numeroSeleccionado;
     fecharConfirmacao();
 
-    const btn = el.sendBtn();
+    const btn  = $id('env-send-btn');
     const orig = btn.innerHTML;
     btn.innerHTML = '<div class="loading-spinner" style="width:14px;height:14px;border-width:2px"></div>';
-    btn.disabled = true;
+    btn.disabled  = true;
 
     try {
       const r = await fetch('/api/sms/enviar', {
-        method: 'POST',
+        method:  'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ numero, corpo }),
+        body:    JSON.stringify({ numero, corpo }),
       });
       const d = await r.json();
 
       if (d.ok) {
         toast(`SMS enviado para ${numero}`, 'success');
-        el.textarea().value = '';
+        /* limpar tudo após envio bem sucedido */
+        $id('env-corpo').value = '';
         actualizarContador();
-        actualizarBotaoEnvio();
-        // Adicionar bolha enviada ao thread sem recarregar tudo
-        adicionarBolhaEnviada(corpo);
+        limparSeleccao();
+        $id('env-resultados').innerHTML = '';
+        $id('env-pesquisa').value = '';
       } else {
         toast(`Erro: ${d.erro}`, 'error');
+        btn.innerHTML = orig;
+        actualizarBotao();
       }
     } catch {
       toast('Erro de rede ao enviar', 'error');
+      btn.innerHTML = orig;
+      actualizarBotao();
     }
-
-    btn.innerHTML = orig;
-    actualizarBotaoEnvio();
   }
 
-  function adicionarBolhaEnviada(corpo) {
-    // Remove estado vazio se existir
-    const vazio = el.thread().querySelector('.env-thread-empty');
-    if (vazio) vazio.remove();
-
-    const bub = document.createElement('div');
-    bub.className = 'env-bubble env-bubble-out';
-    bub.innerHTML = `
-      <div>${escHtml(corpo)}</div>
-      <div class="env-bubble-meta">${fmtDataThread(new Date().toISOString())}</div>
-    `;
-    el.thread().appendChild(bub);
-    el.thread().scrollTop = el.thread().scrollHeight;
-  }
-
-  /* ════════════════════════════════════════════════════
+  /* ════════════════════════════════════════════════
      UTILITÁRIOS
-     ════════════════════════════════════════════════════ */
+  ════════════════════════════════════════════════ */
 
-  function escHtml(str) {
-    return (str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  function esc(str) {
+    return (str || '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;');
   }
 
-  function fmtDataThread(str) {
-    if (!str) return '';
-    const d = new Date(str);
-    if (isNaN(d)) return str.slice(0, 16);
-    const hoje = new Date();
-    const mesmodia =
-      d.getDate() === hoje.getDate() &&
-      d.getMonth() === hoje.getMonth() &&
-      d.getFullYear() === hoje.getFullYear();
-    if (mesmodia) {
-      return d.toLocaleTimeString('pt', { hour: '2-digit', minute: '2-digit' });
-    }
-    return d.toLocaleDateString('pt', { day: '2-digit', month: '2-digit' }) +
-           ' ' + d.toLocaleTimeString('pt', { hour: '2-digit', minute: '2-digit' });
-  }
+  /* ════════════════════════════════════════════════
+     EVENTOS
+  ════════════════════════════════════════════════ */
 
-  /* ════════════════════════════════════════════════════
-     PERMITIR ENVIO PARA NÚMERO DIGITADO DIRECTAMENTE
-     (se não estiver na lista de contactos)
-     ════════════════════════════════════════════════════ */
+  $id('env-pesquisar-btn').addEventListener('click', pesquisar);
 
-  function tentarSeleccionarNumeroDigitado(valor) {
-    const v = valor.trim();
-    // Aceita se parecer um número de telemóvel (pelo menos 6 dígitos, pode ter + e espaços)
-    if (/^[+\d][\d\s\-]{5,}$/.test(v)) {
-      const c = { numero: v, preview: 'Número digitado manualmente', ultima: '' };
-      seleccionarContacto(c);
-    }
-  }
+  $id('env-pesquisa').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') pesquisar();
+  });
 
-  /* ════════════════════════════════════════════════════
-     INIT — ligar eventos
-     ════════════════════════════════════════════════════ */
+  $id('env-dest-clear').addEventListener('click', limparSeleccao);
 
-  function init() {
-    // Pesquisa / filtro
-    el.search().addEventListener('input', (e) => {
-      filtrarContactos(e.target.value);
-    });
+  $id('env-corpo').addEventListener('input', actualizarContador);
 
-    // Enter na pesquisa → se não houver match, tenta usar como número
-    el.search().addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') {
-        if (_filtrados.length === 1) {
-          seleccionarContacto(_filtrados[0]);
-        } else if (_filtrados.length === 0) {
-          tentarSeleccionarNumeroDigitado(e.target.value);
-        }
-      }
-    });
+  $id('env-send-btn').addEventListener('click', abrirConfirmacao);
 
-    // Refresh da lista
-    el.refreshBtn().addEventListener('click', carregarContactos);
+  $id('env-confirm-close').addEventListener('click', fecharConfirmacao);
+  $id('env-confirm-cancel').addEventListener('click', fecharConfirmacao);
+  $id('env-confirm-ok').addEventListener('click', confirmarEnvio);
 
-    // Limpar selecção
-    el.destClear().addEventListener('click', limparSeleccao);
+  $id('env-confirm-modal').addEventListener('click', (e) => {
+    if (e.target === $id('env-confirm-modal')) fecharConfirmacao();
+  });
 
-    // Textarea: contador + botão
-    el.textarea().addEventListener('input', () => {
-      actualizarContador();
-      actualizarBotaoEnvio();
-    });
-
-    // Botão de envio → abre confirmação
-    el.sendBtn().addEventListener('click', abrirConfirmacao);
-
-    // Modal de confirmação
-    el.confirmClose().addEventListener('click', fecharConfirmacao);
-    el.confirmCancel().addEventListener('click', fecharConfirmacao);
-    el.confirmOk().addEventListener('click', confirmarEnvio);
-    el.confirmModal().addEventListener('click', (e) => {
-      if (e.target === el.confirmModal()) fecharConfirmacao();
-    });
-
-    // Carregar contactos na primeira vez que a view é activada
-    document.querySelectorAll('.nav-item').forEach(btn => {
-      if (btn.dataset.view === 'enviar') {
-        btn.addEventListener('click', () => {
-          if (!_contactos.length) carregarContactos();
-        });
-      }
-    });
-  }
-
-  /* Expõe init e carregarContactos para o app.js */
-  return { init, carregarContactos };
 })();
