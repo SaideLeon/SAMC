@@ -4,6 +4,77 @@
 
 ---
 
+## ⚠️ Pré-requisitos Importantes
+
+### Termux e Termux:API — instalar APENAS pelo GitHub
+
+As versões do **Google Play Store não funcionam** — as APIs internas são diferentes e o `termux-sms-list` não estará disponível.
+
+**Passos:**
+
+1. Descarrega os APKs oficiais:
+   - Termux: [github.com/termux/termux-app/releases](https://github.com/termux/termux-app/releases)
+   - Termux:API: [github.com/termux/termux-api/releases](https://github.com/termux/termux-api/releases)
+
+2. Antes de instalar o **Termux:API**, desactiva temporariamente o **Play Protect**:
+   - Google Play → ícone de perfil → **Play Protect** → ⚙️ → desactiva **"Verificar ameaças"**
+
+3. Instala os dois `.apk`
+
+4. Após a instalação, **reactiva o Play Protect**
+
+---
+
+## Instalação
+
+### 1. Instalar dependências do sistema
+
+```bash
+pkg update && pkg upgrade -y
+pkg install python git termux-api
+```
+
+### 2. Clonar o projecto
+
+```bash
+git clone https://github.com/SaideLeon/SAMC.git
+cd SAMC
+```
+
+### 3. Instalar dependências Python
+
+```bash
+pip install -r requirements.txt
+```
+
+### 4. Conceder permissão de acesso aos SMS
+
+Executa este comando e **aceita a permissão** quando o Android pedir:
+
+```bash
+termux-sms-list -l 1
+```
+
+> Sem este passo a aplicação não consegue ler nenhuma mensagem.
+
+### 5. Definir a chave da API Gemini
+
+```bash
+export GEMINI_API_KEY="a_tua_chave_aqui"
+```
+
+Ou cria um ficheiro `.env` na pasta do projecto (com base no `.env.example`) para não teres de exportar em cada sessão.
+
+### 6. Iniciar o servidor
+
+```bash
+python app.py
+```
+
+Acede a `http://localhost:5000` no browser do telemóvel.
+
+---
+
 ## Funcionalidades
 
 - **Mensagens Recentes** — lista as últimas N mensagens da caixa de entrada
@@ -20,7 +91,7 @@
 ## Estrutura do Projecto
 
 ```
-samc/
+SAMC/
 ├── app.py                  # Backend Flask + API Gemini
 ├── requirements.txt        # Dependências Python
 ├── .env.example            # Variáveis de ambiente necessárias
@@ -36,45 +107,22 @@ samc/
 
 ---
 
-## Instalação (Termux)
-
-```bash
-# 1. Instalar dependências do sistema
-pkg install python
-
-# 2. Entrar na pasta do projecto
-cd samc
-
-# 3. Instalar dependências Python
-pip install -r requirements.txt
-
-# 4. Definir a chave da API Gemini
-export GEMINI_API_KEY="a_tua_chave_aqui"
-
-# 5. Iniciar o servidor
-python app.py
-```
-
-Acede depois a `http://localhost:5000` no browser do telemóvel.
-
----
-
 ## Variáveis de Ambiente
 
-| Variável         | Descrição                          | Obrigatória |
-|------------------|------------------------------------|-------------|
-| `GEMINI_API_KEY` | Chave da API Google Gemini         | Sim         |
+| Variável         | Descrição                  | Obrigatória |
+|------------------|----------------------------|-------------|
+| `GEMINI_API_KEY` | Chave da API Google Gemini | Sim         |
 
 ---
 
 ## Stack Técnica
 
-| Componente | Tecnologia              |
-|------------|-------------------------|
-| Backend    | Python · Flask          |
-| IA         | Google Gemini 2.5 Flash |
-| Streaming  | SSE (Server-Sent Events)|
-| Frontend   | HTML · CSS · JS vanilla |
+| Componente | Tecnologia                     |
+|------------|--------------------------------|
+| Backend    | Python · Flask                 |
+| IA         | Google Gemini 2.5 Flash        |
+| Streaming  | SSE (Server-Sent Events)       |
+| Frontend   | HTML · CSS · JS vanilla        |
 | SMS        | Termux:API (`termux-sms-list`) |
 
 ---
