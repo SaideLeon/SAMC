@@ -141,6 +141,7 @@ const VIEW_LABELS = {
   chat:       'Chat com IA',
   remetentes: 'Remetentes Suspeitos',
   enviar:     'Enviar SMS',
+  alma:       'Dr. Alma · Psicóloga',
 };
 
 function activateView(nome) {
@@ -291,7 +292,6 @@ $('#rec-carregar').addEventListener('click', async () => {
    VIEW: CONTACTO
    ════════════════════════════════════════════════════ */
 
-// Contexto de exportação específico da view Contacto
 let _conExportContext = null;
 
 $('#con-carregar').addEventListener('click', async () => {
@@ -301,7 +301,6 @@ $('#con-carregar').addEventListener('click', async () => {
   if (!endereco) { toast('Insere um número ou nome', 'error'); return; }
   setLoading(btn, true);
 
-  // Esconde a barra de export enquanto carrega nova pesquisa
   $('#con-export').classList.add('hidden');
   _conExportContext = null;
 
@@ -311,10 +310,7 @@ $('#con-carregar').addEventListener('click', async () => {
     renderMsgs(d.mensagens, 'con-lista');
 
     if (d.mensagens && d.mensagens.length > 0) {
-      // Guarda contexto para os botões de exportar
       _conExportContext = { mensagens: d.mensagens, titulo: `SMS — ${endereco}` };
-
-      // Actualiza a legenda e mostra a barra
       $('#con-export-info').textContent =
         `${d.mensagens.length} mensagem(ns) de "${endereco}"`;
       $('#con-export').classList.remove('hidden');
@@ -323,7 +319,6 @@ $('#con-carregar').addEventListener('click', async () => {
   setLoading(btn, false);
 });
 
-// Botão Exportar .txt na view Contacto
 $('#con-export-txt').addEventListener('click', async () => {
   if (!_conExportContext) return;
   const endereco = $('#con-endereco').value.trim() || 'contacto';
@@ -335,7 +330,6 @@ $('#con-export-txt').addEventListener('click', async () => {
   );
 });
 
-// Botão Exportar .json na view Contacto
 $('#con-export-json').addEventListener('click', async () => {
   if (!_conExportContext) return;
   const endereco = $('#con-endereco').value.trim() || 'contacto';

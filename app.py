@@ -282,6 +282,34 @@ def api_remetentes_ia():
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
     )
 
+# ─── API: Dr. Alma ────────────────────────────────────────────────────────────
+
+@app.route("/api/alma/chat", methods=["POST"])
+def api_alma_chat():
+    """
+    Recebe o histórico completo de mensagens (formato Gemini nativo com 'parts')
+    já montado pelo frontend e faz o stream SSE de volta.
+    O frontend monta o system prompt + contexto das SMS + histórico do chat.
+    """
+    data     = request.json or {}
+    mensagens = data.get("mensagens", [])
+
+    if not mensagens:
+        def vazio():
+            yield "data: [Erro: sem mensagens para processar]\n\n"
+            yield "data: [DONE]\n\n"
+        return Response(
+            stream_with_context(vazio()),
+            content_type="text/event-stream",
+            headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+        )
+
+    return Response(
+        stream_with_context(gemini_stream_sse(mensagens)),
+        content_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
+
 # ─── API: Export ──────────────────────────────────────────────────────────────
 
 @app.route("/api/export/txt", methods=["POST"])
@@ -366,7 +394,7 @@ def pwa_manifest():
     return app.send_static_file("manifest.json"), 200, {
         "Content-Type": "application/manifest+json",
     }
-    
+
 if __name__ == "__main__":
     print("\n  SAMC — Sistema de Análise de Mensagens Curtas — a iniciar em http://localhost:5000\n")
     app.run(host="0.0.0.0", port=5000, debug=False, threaded=True)

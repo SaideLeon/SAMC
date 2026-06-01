@@ -15,6 +15,7 @@
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/static/css/style.css">
 <link rel="stylesheet" href="/static/css/enviar.css">
+<link rel="stylesheet" href="/static/css/alma.css">
 </head>
 <script>
   if ('serviceWorker' in navigator) {
@@ -74,6 +75,13 @@
     </div>
 
     <div class="nav-group">
+      <div class="nav-label">PSICOLOGIA</div>
+      <button class="nav-item" data-view="alma">
+        <span class="nav-icon">♦</span> Dr. Alma
+      </button>
+    </div>
+
+    <div class="nav-group">
       <div class="nav-label">ENVIAR</div>
       <button class="nav-item" data-view="enviar">
         <span class="nav-icon">▶</span> Enviar SMS
@@ -125,16 +133,11 @@
       <button class="btn btn-primary" id="con-carregar">Carregar</button>
     </div>
 
-    <!-- Barra de exportação — aparece depois de carregar mensagens -->
     <div class="con-export-bar hidden" id="con-export">
       <span class="con-export-info" id="con-export-info"></span>
       <div class="con-export-btns">
-        <button class="btn btn-outline" id="con-export-txt">
-          <span>⊞</span> .txt
-        </button>
-        <button class="btn btn-outline" id="con-export-json">
-          <span>⊞</span> .json
-        </button>
+        <button class="btn btn-outline" id="con-export-txt"><span>⊞</span> .txt</button>
+        <button class="btn btn-outline" id="con-export-json"><span>⊞</span> .json</button>
       </div>
     </div>
 
@@ -282,10 +285,91 @@
     </div>
   </section>
 
+  <!-- ─── VIEW: DR. ALMA ─── -->
+  <section class="view" id="view-alma">
+
+    <!-- Cabeçalho permanente da Dra. Alma -->
+    <div class="alma-header">
+      <div class="alma-avatar">♦</div>
+      <div class="alma-info">
+        <div class="alma-name">Dr. Alma</div>
+        <div class="alma-title">Psicóloga Clínica · Terapia de Casais &amp; Relações · TCC-C · EFT</div>
+        <div class="alma-status-row">
+          <div class="alma-dot" id="alma-dot-1"></div>
+          <span class="alma-status-txt" id="alma-status-1">Disponível</span>
+        </div>
+      </div>
+      <button class="alma-reset-btn" id="alma-reset-btn" title="Novo contacto">↺ Novo</button>
+    </div>
+
+    <!-- FASE: Selecção do contacto -->
+    <div class="alma-phase active" data-fase="seleccao">
+      <div class="alma-phase-label">Seleccionar Contacto</div>
+
+      <div class="alma-intro-box">
+        Olá. Sou a <strong>Dr. Alma</strong>, psicóloga especializada em relações interpessoais e terapia de casais.<br><br>
+        Para iniciar a análise, indica o <strong>número de telefone ou nome</strong> do contacto cujas mensagens queres que eu avalie.
+        Vou analisar o historial de SMS e apresentar-te um diagnóstico clínico honesto sobre os padrões de comunicação, dinâmicas relacionais e pontos de atenção.
+      </div>
+
+      <div class="view-controls">
+        <div class="control-group" style="flex:1">
+          <label class="ctrl-label">Número ou nome do contacto</label>
+          <input
+            type="text"
+            class="ctrl-input"
+            id="alma-contacto-input"
+            placeholder="+258... ou nome do contacto"
+            autocomplete="off"
+          >
+        </div>
+        <div class="control-group">
+          <label class="ctrl-label">Limite de msgs</label>
+          <input type="number" class="ctrl-input" id="alma-limite" value="300" min="1" max="2000" style="width:80px">
+        </div>
+        <button class="btn btn-primary" id="alma-pesquisar-btn"
+          style="background:var(--alma);color:#fff">
+          Pesquisar
+        </button>
+      </div>
+
+      <div id="alma-pesquisa-resultado"></div>
+    </div>
+
+    <!-- FASE: Análise em curso + Chat -->
+    <div class="alma-phase" data-fase="analise">
+
+      <!-- Relatório gerado -->
+      <div class="alma-phase-label">Relatório Clínico</div>
+      <div id="alma-relatorio-wrap"></div>
+
+      <!-- Chat com a Dra. Alma -->
+      <div class="hidden" id="alma-chat-section">
+        <div class="alma-phase-label" style="margin-top:0.5rem">Continuar em Sessão</div>
+        <div class="alma-chat-wrap" style="min-height:260px">
+          <div class="alma-chat-header">
+            ♦ Sessão com Dr. Alma
+          </div>
+          <div class="alma-chat-msgs" id="alma-chat-msgs"></div>
+          <div class="alma-input-bar">
+            <input
+              type="text"
+              class="alma-input"
+              id="alma-chat-input"
+              placeholder="Faz uma pergunta à Dr. Alma…"
+            >
+            <button class="alma-send-btn" id="alma-chat-send" disabled>↑</button>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+  </section>
+
   <!-- ─── VIEW: ENVIAR SMS ─── -->
   <section class="view" id="view-enviar">
 
-    <!-- 1. Pesquisa de mensagens para obter o número -->
     <div class="view-controls">
       <div class="control-group env-search-group">
         <label class="ctrl-label">Pesquisar mensagem para obter número</label>
@@ -304,14 +388,12 @@
       <button class="btn btn-primary" id="env-pesquisar-btn">Pesquisar</button>
     </div>
 
-    <!-- 2. Barra do número seleccionado -->
     <div class="env-dest-bar hidden" id="env-dest-bar">
       <span class="env-dest-label">PARA:</span>
       <span class="env-dest-numero" id="env-dest-numero">—</span>
       <button class="env-dest-clear" id="env-dest-clear">✕ limpar</button>
     </div>
 
-    <!-- 3. Área de composição -->
     <div class="env-compose-box">
       <div class="env-compose-header">MENSAGEM A ENVIAR</div>
       <div class="env-compose-inner">
@@ -333,10 +415,8 @@
       </div>
     </div>
 
-    <!-- 4. Resultados da pesquisa -->
     <div id="env-resultados" class="msg-lista"></div>
 
-    <!-- Modal de confirmação -->
     <div class="modal-backdrop hidden" id="env-confirm-modal">
       <div class="modal">
         <div class="modal-header">
@@ -385,5 +465,6 @@
 <script src="/static/js/md.js"></script>
 <script src="/static/js/app.js"></script>
 <script src="/static/js/enviar.js"></script>
+<script src="/static/js/alma.js"></script>
 </body>
 </html>
