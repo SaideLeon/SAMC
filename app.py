@@ -81,21 +81,100 @@ def gemini_stream_sse(historico):
 
 # ─── Helpers SMS ──────────────────────────────────────────────────────────────
 
+# Mapeamento de tipos para o código numérico do Android
 TIPOS_SMS = {"inbox": 1, "sent": 2, "draft": 3, "outbox": 4}
 
 def get_sms(limite=50, tipo="all", endereco=None):
-    cmd = ["termux-sms-list", f"--message-limit={limite}"]
+    """
+    Lê SMS via termux-sms-list.
+
+    Estratégia de compatibilidade:
+    - Usa apenas --message-limit e --message-selection (flags universais).
+    - NÃO usa --message-address: a flag existe nalgumas versões mas falha
+      com números que contêm '+' e não está disponível em versões antigas.
+    - Filtro por endereço é feito em Python após receber todos os resultados.
+    - Quando tipo != "all", aplica --message-selection para reduzir os dados
+      transferidos antes do filtro Python.
+    """
+    cmd = ["termux-sms-list", "--message-limit", str(limite)]
+
+    # Filtro de tipo via --message-selection (formato correcto: sem '=')
     if tipo != "all" and tipo in TIPOS_SMS:
-        cmd += [f"--message-selection=type == {TIPOS_SMS[tipo]}"]
-    if endereco:
-        cmd += [f"--message-address={endereco}"]
+        cmd += ["--message-selection", f"type = {TIPOS_SMS[tipo]}"]
+
     try:
         result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
-        if not result.stdout.strip():
+
+        stderr = result.stderr.strip()
+        if stderr:
+            # Loga o erro sem rebentar a app — útil para debug
+            print(f"[termux-sms-list stderr] {stderr}", flush=True)
+
+        raw = (result.stdout or "").strip()
+        if not raw:
             return []
-        return list(reversed(json.loads(result.stdout)))
-    except Exception:
+
+        msgs = json.loads(raw)
+
+        # Filtro pós-fetch por endereço — robusto a variações de formato do número
+        if endereco:
+            endereco_norm = _normalizar_numero(endereco)
+            msgs = [
+                m for m in msgs
+                if _numero_coincide(endereco_norm, m.get("address") or m.get("sender") or "")
+            ]
+
+        # termux-sms-list devolve do mais antigo para o mais recente; invertemos
+        return list(reversed(msgs))
+
+    except json.JSONDecodeError as e:
+        print(f"[get_sms] JSON inválido: {e}", flush=True)
         return []
+    except subprocess.TimeoutExpired:
+        print("[get_sms] Timeout a correr termux-sms-list", flush=True)
+        return []
+    except FileNotFoundError:
+        print("[get_sms] termux-sms-list não encontrado. Instala o pacote termux-api.", flush=True)
+        return []
+    except Exception as e:
+        print(f"[get_sms] Erro inesperado: {e}", flush=True)
+        return []
+
+
+def _normalizar_numero(numero):
+    """
+    Remove espaços, hífens e parênteses para comparação.
+    Mantém o '+' inicial se existir.
+    """
+    import re
+    return re.sub(r"[\s\-\(\)]", "", (numero or "").strip())
+
+
+def _numero_coincide(pesquisa, candidato):
+    """
+    Devolve True se 'pesquisa' coincidir com 'candidato'.
+    Compara por sufixo quando um dos dois não tem código de país,
+    e também faz pesquisa por nome (case-insensitive substring).
+    """
+    if not pesquisa or not candidato:
+        return False
+
+    cand_norm = _normalizar_numero(candidato)
+
+    # Correspondência exacta
+    if pesquisa == cand_norm:
+        return True
+
+    # Correspondência por sufixo (ex: "84..." vs "+25884...")
+    if cand_norm.endswith(pesquisa) or pesquisa.endswith(cand_norm):
+        return True
+
+    # Pesquisa por nome/texto (case-insensitive)
+    if pesquisa.lower() in candidato.lower():
+        return True
+
+    return False
+
 
 def remetente(msg):
     return msg.get("sender") or msg.get("address") or "?"
@@ -286,11 +365,6 @@ def api_remetentes_ia():
 
 @app.route("/api/alma/chat", methods=["POST"])
 def api_alma_chat():
-    """
-    Recebe o histórico completo de mensagens (formato Gemini nativo com 'parts')
-    já montado pelo frontend e faz o stream SSE de volta.
-    O frontend monta o system prompt + contexto das SMS + histórico do chat.
-    """
     data     = request.json or {}
     mensagens = data.get("mensagens", [])
 
