@@ -81,33 +81,46 @@ def gemini_stream_sse(historico):
 
 # ─── Helpers SMS ──────────────────────────────────────────────────────────────
 
-# Mapeamento de tipos para o código numérico do Android
-TIPOS_SMS = {"inbox": 1, "sent": 2, "draft": 3, "outbox": 4}
-
 def get_sms(limite=50, tipo="all", endereco=None):
     """
     Lê SMS via termux-sms-list.
 
-    Estratégia de compatibilidade:
-    - Usa apenas --message-limit e --message-selection (flags universais).
-    - NÃO usa --message-address: a flag existe nalgumas versões mas falha
-      com números que contêm '+' e não está disponível em versões antigas.
-    - Filtro por endereço é feito em Python após receber todos os resultados.
-    - Quando tipo != "all", aplica --message-selection para reduzir os dados
-      transferidos antes do filtro Python.
-    """
-    cmd = ["termux-sms-list", "--message-limit", str(limite)]
+    Usa as flags correctas desta versão do termux-api:
+    - --message-limit       para o número de mensagens
+    - --message-type        para filtrar por tipo (inbox/sent/etc.)
+    - --message-address     para filtrar por endereço/número (nativo, mais eficiente)
+    - --message-selection   para filtros SQL compostos (usa == não =)
 
-    # Filtro de tipo via --message-selection (formato correcto: sem '=')
-    if tipo != "all" and tipo in TIPOS_SMS:
-        cmd += ["--message-selection", f"type = {TIPOS_SMS[tipo]}"]
+    Nota: --message-address pode falhar com números que contenham '+' em algumas
+    versões; nesse caso cai para filtro Python como fallback.
+    """
+    cmd = ["termux-sms-list", f"--message-limit={limite}"]
+
+    # Filtro de tipo via --message-type (flag directa, mais simples)
+    if tipo != "all":
+        cmd += [f"--message-type={tipo}"]
+
+    # Filtro por endereço: usa a flag nativa quando disponível
+    use_python_filter = False
+    if endereco:
+        try:
+            # Tenta usar a flag nativa --message-address
+            cmd_addr = cmd + [f"--message-address={endereco.strip()}"]
+            result = subprocess.run(cmd_addr, capture_output=True, text=True, timeout=30)
+            if result.returncode == 0 and result.stdout.strip():
+                raw = result.stdout.strip()
+                msgs = json.loads(raw)
+                return list(reversed(msgs))
+            # Se falhou ou devolveu vazio, cai para filtro Python
+            use_python_filter = True
+        except Exception:
+            use_python_filter = True
 
     try:
         result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
 
         stderr = result.stderr.strip()
         if stderr:
-            # Loga o erro sem rebentar a app — útil para debug
             print(f"[termux-sms-list stderr] {stderr}", flush=True)
 
         raw = (result.stdout or "").strip()
@@ -116,15 +129,14 @@ def get_sms(limite=50, tipo="all", endereco=None):
 
         msgs = json.loads(raw)
 
-        # Filtro pós-fetch por endereço — robusto a variações de formato do número
-        if endereco:
+        # Filtro Python por endereço (fallback)
+        if endereco and use_python_filter:
             endereco_norm = _normalizar_numero(endereco)
             msgs = [
                 m for m in msgs
                 if _numero_coincide(endereco_norm, m.get("address") or m.get("sender") or "")
             ]
 
-        # termux-sms-list devolve do mais antigo para o mais recente; invertemos
         return list(reversed(msgs))
 
     except json.JSONDecodeError as e:
@@ -141,38 +153,43 @@ def get_sms(limite=50, tipo="all", endereco=None):
         return []
 
 
+def get_sms_selection(selection, limite=50):
+    """
+    Executa uma query SQL arbitrária via --message-selection.
+    ATENÇÃO: esta versão do termux-api usa == (não =) nas comparações.
+    Exemplo: "type == 1 and address == '258841234567'"
+    """
+    cmd = [
+        "termux-sms-list",
+        f"--message-limit={limite}",
+        f"--message-selection={selection}",
+    ]
+    try:
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
+        raw = (result.stdout or "").strip()
+        if not raw:
+            return []
+        return list(reversed(json.loads(raw)))
+    except Exception as e:
+        print(f"[get_sms_selection] Erro: {e}", flush=True)
+        return []
+
+
 def _normalizar_numero(numero):
-    """
-    Remove espaços, hífens e parênteses para comparação.
-    Mantém o '+' inicial se existir.
-    """
     import re
     return re.sub(r"[\s\-\(\)]", "", (numero or "").strip())
 
 
 def _numero_coincide(pesquisa, candidato):
-    """
-    Devolve True se 'pesquisa' coincidir com 'candidato'.
-    Compara por sufixo quando um dos dois não tem código de país,
-    e também faz pesquisa por nome (case-insensitive substring).
-    """
     if not pesquisa or not candidato:
         return False
-
     cand_norm = _normalizar_numero(candidato)
-
-    # Correspondência exacta
     if pesquisa == cand_norm:
         return True
-
-    # Correspondência por sufixo (ex: "84..." vs "+25884...")
     if cand_norm.endswith(pesquisa) or pesquisa.endswith(cand_norm):
         return True
-
-    # Pesquisa por nome/texto (case-insensitive)
     if pesquisa.lower() in candidato.lower():
         return True
-
     return False
 
 
