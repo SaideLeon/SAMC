@@ -437,11 +437,14 @@ def api_export_json():
 
 # ─── API: Enviar SMS ──────────────────────────────────────────────────────────
 
-@app.route("/api/sms/enviar", methods=["POST"])
+@@app.route("/api/sms/enviar", methods=["POST"])
 def api_sms_enviar():
     data   = request.json or {}
     numero = (data.get("numero") or "").strip()
     corpo  = (data.get("corpo") or "").strip()
+
+    # ── Normalizar número: remover prefixo +258 ou 258 ──
+    numero = re.sub(r'^\+?258', '', numero)
 
     if not numero:
         return jsonify({"ok": False, "erro": "Número em falta"}), 400
