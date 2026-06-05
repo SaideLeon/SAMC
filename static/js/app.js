@@ -142,6 +142,7 @@ const VIEW_LABELS = {
   remetentes: 'Remetentes Suspeitos',
   enviar:     'Enviar SMS',
   alma:       'Dr. Alma · Psicóloga',
+  tunnel: 'Cloudflare Tunnel',
 };
 
 function activateView(nome) {
@@ -627,4 +628,123 @@ $('#rem-ia-btn').addEventListener('click', async () => {
 checkStatus();
 activateView('recentes');
 setTimeout(() => $('#rec-carregar').click(), 300);
+
+
+/* ════════════════════════════════════════════════════
+   VIEW: TUNNEL
+   ════════════════════════════════════════════════════ */
+
+(function () {
+  const $t = id => document.getElementById(id);
+
+  let _polling = null;
+
+  function setTunnelUI(running, url) {
+    $t('tun-start-btn').disabled  = running;
+    $t('tun-stop-btn').disabled   = !running;
+
+    if (url) {
+      $t('tun-url-link').href        = url;
+      $t('tun-url-link').textContent = url;
+      $t('tun-url-box').style.display = 'block';
+    } else if (!running) {
+      $t('tun-url-box').style.display = 'none';
+    }
+
+    $t('tun-icon').style.color      = running ? 'var(--green)' : '';
+    $t('tun-icon').style.textShadow = running ? '0 0 20px var(--green-glow)' : '';
+  }
+
+  function setStatus(msg, cor = 'var(--text-dim)') {
+    const el = $t('tun-status');
+    el.textContent = msg;
+    el.style.color = cor;
+  }
+
+  function renderLog(lines) {
+    if (!lines || !lines.length) return;
+    const wrap = $t('tun-log-wrap');
+    const box  = $t('tun-log');
+    wrap.style.display = 'block';
+    box.textContent    = lines.join('\n');
+    box.scrollTop      = box.scrollHeight;
+  }
+
+  async function pollStatus() {
+    try {
+      const r = await fetch('/api/tunnel/status');
+      const d = await r.json();
+      setTunnelUI(d.running, d.url);
+      renderLog(d.log);
+      if (d.url) setStatus(`Activo: ${d.url}`, 'var(--green)');
+      else if (d.running) setStatus('Tunnel a iniciar…', 'var(--yellow)');
+      else setStatus('Tunnel inactivo.', 'var(--text-dim)');
+    } catch {}
+  }
+
+  function startPolling() {
+    stopPolling();
+    _polling = setInterval(pollStatus, 3000);
+  }
+
+  function stopPolling() {
+    if (_polling) { clearInterval(_polling); _polling = null; }
+  }
+
+  $t('tun-start-btn').addEventListener('click', async () => {
+    const btn = $t('tun-start-btn');
+    setLoading(btn, true);
+    setStatus('A lançar tunnel…', 'var(--yellow)');
+    try {
+      const r = await fetch('/api/tunnel/start', { method: 'POST' });
+      const d = await r.json();
+      if (d.ok) {
+        setTunnelUI(true, d.url);
+        setStatus(d.msg, d.url ? 'var(--green)' : 'var(--yellow)');
+        toast(d.msg, d.url ? 'success' : 'error');
+        startPolling();
+      } else {
+        setStatus(d.error || 'Erro ao iniciar tunnel.', 'var(--red)');
+        toast(d.error || 'Erro', 'error');
+      }
+    } catch {
+      setStatus('Erro de rede.', 'var(--red)');
+      toast('Erro de rede', 'error');
+    }
+    setLoading(btn, false);
+  });
+
+  $t('tun-stop-btn').addEventListener('click', async () => {
+    stopPolling();
+    try {
+      const r = await fetch('/api/tunnel/stop', { method: 'POST' });
+      const d = await r.json();
+      setTunnelUI(false, null);
+      setStatus(d.msg, 'var(--text-dim)');
+      toast(d.msg);
+    } catch { toast('Erro ao parar tunnel', 'error'); }
+  });
+
+  $t('tun-status-btn').addEventListener('click', async () => {
+    await pollStatus();
+    toast('Estado actualizado');
+  });
+
+  $t('tun-copy-btn').addEventListener('click', () => {
+    const url = $t('tun-url-link').href;
+    if (!url || url === '#') return;
+    navigator.clipboard.writeText(url)
+      .then(() => toast('URL copiado!'))
+      .catch(() => toast('Não foi possível copiar', 'error'));
+  });
+
+  // Poll automático quando a view está activa
+  document.querySelectorAll('.nav-item').forEach(btn => {
+    btn.addEventListener('click', () => {
+      if (btn.dataset.view === 'tunnel') { pollStatus(); startPolling(); }
+      else stopPolling();
+    });
+  });
+})();
+
 /* fim */

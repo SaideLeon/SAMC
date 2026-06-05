@@ -87,6 +87,12 @@
         <span class="nav-icon">▶</span> Enviar SMS
       </button>
     </div>
+    <div class="nav-group">
+  <div class="nav-label">REDE</div>
+  <button class="nav-item" data-view="tunnel">
+    <span class="nav-icon">⊙</span> Tunnel
+  </button>
+</div>
   </nav>
 
   <div class="sidebar-status" id="statusBar">
@@ -97,6 +103,48 @@
 
 <!-- ═══ OVERLAY ═══ -->
 <div class="overlay" id="overlay"></div>
+<!-- ─── VIEW: TUNNEL ─── -->
+<section class="view" id="view-tunnel">
+  <div class="backup-card" style="max-width:520px">
+    <div class="backup-icon" id="tun-icon">⊙</div>
+    <h2 class="backup-title">Cloudflare Tunnel</h2>
+    <p class="backup-desc">
+      Expõe o SAMC publicamente via Cloudflare — acede de qualquer dispositivo sem configurar o router.
+    </p>
+
+    <!-- URL pública (aparece quando activo) -->
+    <div id="tun-url-box" style="display:none;margin-top:1.25rem">
+      <div style="font-size:0.6rem;font-weight:700;letter-spacing:.12em;color:var(--text-muted);margin-bottom:.4rem">URL PÚBLICA</div>
+      <a id="tun-url-link" href="#" target="_blank"
+         style="font-size:.82rem;color:var(--cyan);word-break:break-all;text-decoration:none;
+                border:1px solid var(--cyan-dim);border-radius:var(--radius);padding:.45rem .9rem;
+                display:block;background:var(--cyan-glow)">—</a>
+      <button id="tun-copy-btn" class="btn btn-outline" style="margin-top:.5rem;width:100%">⊞ Copiar URL</button>
+    </div>
+
+    <div class="backup-btns" style="margin-top:1.25rem">
+      <button class="btn btn-primary" id="tun-start-btn"
+              style="background:var(--green);color:var(--bg)">
+        ▶ Iniciar Tunnel
+      </button>
+      <button class="btn btn-outline" id="tun-stop-btn" style="color:var(--red);border-color:var(--red)" disabled>
+        ■ Parar Tunnel
+      </button>
+      <button class="btn btn-outline" id="tun-status-btn">↺ Estado</button>
+    </div>
+
+    <div id="tun-status" class="backup-status" style="min-height:1.4em"></div>
+
+    <!-- Log box (colapsável) -->
+    <div id="tun-log-wrap" style="display:none;margin-top:1rem;text-align:left">
+      <div style="font-size:.6rem;font-weight:700;letter-spacing:.12em;color:var(--text-muted);margin-bottom:.4rem">LOG</div>
+      <div id="tun-log"
+           style="background:var(--bg4);border:1px solid var(--border);border-radius:var(--radius);
+                  padding:.65rem .9rem;font-size:.65rem;line-height:1.6;color:var(--text-dim);
+                  max-height:180px;overflow-y:auto;white-space:pre-wrap;word-break:break-all"></div>
+    </div>
+  </div>
+</section>
 
 <!-- ═══ MAIN ═══ -->
 <main class="main">

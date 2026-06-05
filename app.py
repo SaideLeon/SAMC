@@ -2,7 +2,8 @@
 SAMC — Sistema de Análise de Mensagens Curtas — Flask Backend
 Termux + Gemini + SSE streaming
 """
-
+import threading
+import re
 import subprocess, json, os
 from datetime import datetime
 from collections import Counter
@@ -486,6 +487,111 @@ def pwa_manifest():
         "Content-Type": "application/manifest+json",
     }
 
+
+
+# ─── Cloudflare Tunnel ────────────────────────────────────────────────────────
+_tunnel_proc   = None   # subprocess do cloudflared
+_tunnel_url    = None   # URL pública atribuída
+_tunnel_lock   = threading.Lock()
+_tunnel_log    = []     # buffer das últimas linhas de log
+
+def _cloudflared_reader(proc):
+    """Lê stdout+stderr do cloudflared em background e extrai a URL pública."""
+    global _tunnel_url
+    url_pattern = re.compile(r'https://[a-z0-9\-]+\.trycloudflare\.com')
+    try:
+        for line in proc.stderr:
+            line = line.strip()
+            if not line:
+                continue
+            _tunnel_log.append(line)
+            if len(_tunnel_log) > 100:
+                _tunnel_log.pop(0)
+            if not _tunnel_url:
+                m = url_pattern.search(line)
+                if m:
+                    _tunnel_url = m.group(0)
+                    print(f"[Tunnel] URL pública: {_tunnel_url}", flush=True)
+    except Exception:
+        pass
+
+
+@app.route("/api/tunnel/start", methods=["POST"])
+def api_tunnel_start():
+    global _tunnel_proc, _tunnel_url, _tunnel_log
+
+    with _tunnel_lock:
+        # Se já está a correr, devolve o estado actual
+        if _tunnel_proc and _tunnel_proc.poll() is None:
+            return jsonify({
+                "ok":     True,
+                "status": "running",
+                "url":    _tunnel_url,
+                "msg":    "Tunnel já está activo.",
+            })
+
+        # Reinicia estado
+        _tunnel_url = None
+        _tunnel_log = []
+
+        # Tenta lançar o cloudflared
+        try:
+            proc = subprocess.Popen(
+                ["cloudflared", "tunnel", "--url", "http://localhost:5000"],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+            _tunnel_proc = proc
+        except FileNotFoundError:
+            return jsonify({
+                "ok":    False,
+                "error": "cloudflared não encontrado. Instala com: pkg install cloudflared",
+            }), 500
+
+    # Lê logs em background
+    t = threading.Thread(target=_cloudflared_reader, args=(proc,), daemon=True)
+    t.start()
+
+    # Aguarda até 15 s pela URL pública
+    import time
+    for _ in range(30):
+        time.sleep(0.5)
+        if _tunnel_url:
+            break
+
+    return jsonify({
+        "ok":     bool(_tunnel_url),
+        "status": "running" if _tunnel_url else "starting",
+        "url":    _tunnel_url,
+        "msg":    f"Tunnel activo em {_tunnel_url}" if _tunnel_url else "Tunnel a iniciar — tenta /api/tunnel/status em breve.",
+    })
+
+
+@app.route("/api/tunnel/stop", methods=["POST"])
+def api_tunnel_stop():
+    global _tunnel_proc, _tunnel_url, _tunnel_log
+    with _tunnel_lock:
+        if _tunnel_proc and _tunnel_proc.poll() is None:
+            _tunnel_proc.terminate()
+            _tunnel_proc = None
+            _tunnel_url  = None
+            _tunnel_log  = []
+            return jsonify({"ok": True, "msg": "Tunnel terminado."})
+        return jsonify({"ok": False, "msg": "Nenhum tunnel activo."})
+
+
+@app.route("/api/tunnel/status")
+def api_tunnel_status():
+    with _tunnel_lock:
+        running = bool(_tunnel_proc and _tunnel_proc.poll() is None)
+        return jsonify({
+            "running": running,
+            "url":     _tunnel_url,
+            "log":     _tunnel_log[-20:],   # últimas 20 linhas
+        })
+        
+        
 if __name__ == "__main__":
     print("\n  SAMC — Sistema de Análise de Mensagens Curtas — a iniciar em http://localhost:5000\n")
     app.run(host="0.0.0.0", port=5000, debug=False, threaded=True)
