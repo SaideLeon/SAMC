@@ -114,12 +114,23 @@
 
     <!-- URL pública (aparece quando activo) -->
     <div id="tun-url-box" style="display:none;margin-top:1.25rem">
-      <div style="font-size:0.6rem;font-weight:700;letter-spacing:.12em;color:var(--text-muted);margin-bottom:.4rem">URL PÚBLICA</div>
+      <div style="font-size:0.6rem;font-weight:700;letter-spacing:.12em;color:var(--text-muted);margin-bottom:.4rem">URL PÚBLICA (muda a cada sessão)</div>
       <a id="tun-url-link" href="#" target="_blank"
+         style="font-size:.75rem;color:var(--text-dim);word-break:break-all;text-decoration:none;
+                border:1px solid var(--border);border-radius:var(--radius);padding:.45rem .9rem;
+                display:block;background:var(--bg3)">—</a>
+
+      <div style="font-size:0.6rem;font-weight:700;letter-spacing:.12em;color:var(--text-muted);
+                  margin-top:1rem;margin-bottom:.4rem">LINK FIXO (partilha este)</div>
+      <a id="tun-short-link" href="#" target="_blank"
          style="font-size:.82rem;color:var(--cyan);word-break:break-all;text-decoration:none;
                 border:1px solid var(--cyan-dim);border-radius:var(--radius);padding:.45rem .9rem;
-                display:block;background:var(--cyan-glow)">—</a>
-      <button id="tun-copy-btn" class="btn btn-outline" style="margin-top:.5rem;width:100%">⊞ Copiar URL</button>
+                display:block;background:var(--cyan-glow)">A gerar…</a>
+
+      <div style="display:flex;gap:.5rem;margin-top:.5rem">
+        <button id="tun-copy-btn" class="btn btn-outline" style="flex:1">⊞ Copiar Link Fixo</button>
+        <button id="tun-copy-raw-btn" class="btn btn-outline" style="flex:1;font-size:.65rem">⊞ Copiar URL Raw</button>
+      </div>
     </div>
 
     <div class="backup-btns" style="margin-top:1.25rem">

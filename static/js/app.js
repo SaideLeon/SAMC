@@ -639,16 +639,25 @@ setTimeout(() => $('#rec-carregar').click(), 300);
 
   let _polling = null;
 
-  function setTunnelUI(running, url) {
-    $t('tun-start-btn').disabled  = running;
-    $t('tun-stop-btn').disabled   = !running;
+  function setTunnelUI(running, url, shortlink) {
+    $t('tun-start-btn').disabled = running;
+    $t('tun-stop-btn').disabled  = !running;
 
     if (url) {
-      $t('tun-url-link').href        = url;
-      $t('tun-url-link').textContent = url;
+      $t('tun-url-link').href         = url;
+      $t('tun-url-link').textContent  = url;
       $t('tun-url-box').style.display = 'block';
     } else if (!running) {
       $t('tun-url-box').style.display = 'none';
+    }
+
+    // Link fixo
+    if (shortlink) {
+      $t('tun-short-link').href        = shortlink;
+      $t('tun-short-link').textContent = shortlink;
+    } else if (url) {
+      $t('tun-short-link').href        = '#';
+      $t('tun-short-link').textContent = 'A gerar…';
     }
 
     $t('tun-icon').style.color      = running ? 'var(--green)' : '';
@@ -672,13 +681,24 @@ setTimeout(() => $('#rec-carregar').click(), 300);
 
   async function pollStatus() {
     try {
-      const r = await fetch('/api/tunnel/status');
-      const d = await r.json();
-      setTunnelUI(d.running, d.url);
+      const [rs, rsh] = await Promise.all([
+        fetch('/api/tunnel/status'),
+        fetch('/api/shortlink'),
+      ]);
+      const d  = await rs.json();
+      const sh = await rsh.json();
+
+      setTunnelUI(d.running, d.url, sh.shortlink);
       renderLog(d.log);
-      if (d.url) setStatus(`Activo: ${d.url}`, 'var(--green)');
-      else if (d.running) setStatus('Tunnel a iniciar…', 'var(--yellow)');
-      else setStatus('Tunnel inactivo.', 'var(--text-dim)');
+
+      if (d.url && sh.shortlink)
+        setStatus(`Link fixo: ${sh.shortlink}`, 'var(--green)');
+      else if (d.url)
+        setStatus('Activo — a criar link fixo…', 'var(--yellow)');
+      else if (d.running)
+        setStatus('Tunnel a iniciar…', 'var(--yellow)');
+      else
+        setStatus('Tunnel inactivo.', 'var(--text-dim)');
     } catch {}
   }
 
@@ -731,10 +751,18 @@ setTimeout(() => $('#rec-carregar').click(), 300);
   });
 
   $t('tun-copy-btn').addEventListener('click', () => {
+    const url = $t('tun-short-link').href;
+    if (!url || url === '#') return;
+    navigator.clipboard.writeText(url)
+      .then(() => toast('Link fixo copiado!'))
+      .catch(() => toast('Não foi possível copiar', 'error'));
+  });
+
+  $t('tun-copy-raw-btn').addEventListener('click', () => {
     const url = $t('tun-url-link').href;
     if (!url || url === '#') return;
     navigator.clipboard.writeText(url)
-      .then(() => toast('URL copiado!'))
+      .then(() => toast('URL raw copiado!'))
       .catch(() => toast('Não foi possível copiar', 'error'));
   });
 

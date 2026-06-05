@@ -7,7 +7,7 @@ import re
 import subprocess, json, os
 from datetime import datetime
 from collections import Counter
-from flask import Flask, render_template, request, jsonify, Response, stream_with_context
+from flask import Flask, render_template, request, jsonify, Response, stream_with_context, redirect
 import requests as _req
 
 try:
@@ -495,6 +495,56 @@ _tunnel_url    = None   # URL pública atribuída
 _tunnel_lock   = threading.Lock()
 _tunnel_log    = []     # buffer das últimas linhas de log
 
+# ─── Encurtador de Link (slug fixo via is.gd) ─────────────────────────────────
+
+SHORTLINK_SLUG = os.environ.get("SAMC_SLUG", "samc-meu-link")
+_shortlink_url = None   # URL encurtada activa
+
+def atualizar_shortlink(url_longa):
+    """
+    Cria ou actualiza um shortlink com slug fixo via is.gd API.
+    Se o slug já existir, is.gd devolve o mesmo link — sem duplicados.
+    """
+    global _shortlink_url
+    try:
+        r = _req.get(
+            "https://is.gd/create.php",
+            params={
+                "format":   "json",
+                "url":      url_longa,
+                "shorturl": SHORTLINK_SLUG,
+                "logstats": 0,
+            },
+            timeout=10,
+        )
+        data = r.json()
+        if data.get("shorturl"):
+            _shortlink_url = data["shorturl"]
+            print(f"[Shortlink] {_shortlink_url} → {url_longa}", flush=True)
+            return _shortlink_url
+        if data.get("errormessage"):
+            print(f"[Shortlink] {data['errormessage']}", flush=True)
+    except Exception as e:
+        print(f"[Shortlink] Erro ao encurtar: {e}", flush=True)
+    return None
+
+
+@app.route("/go")
+def go_short_redirect():
+    """Redirecciona o link curto local para a URL pública actual do tunnel."""
+    if _tunnel_url:
+        return redirect(_tunnel_url, code=302)
+    return jsonify({"ok": False, "error": "Tunnel ainda não está activo."}), 503
+
+
+@app.route("/api/shortlink")
+def api_shortlink():
+    return jsonify({
+        "shortlink":  _shortlink_url,
+        "tunnel_url": _tunnel_url,
+        "slug":       SHORTLINK_SLUG,
+    })
+
 def _cloudflared_reader(proc):
     """Lê stdout+stderr do cloudflared em background e extrai a URL pública."""
     global _tunnel_url
@@ -512,13 +562,14 @@ def _cloudflared_reader(proc):
                 if m:
                     _tunnel_url = m.group(0)
                     print(f"[Tunnel] URL pública: {_tunnel_url}", flush=True)
+                    threading.Thread(target=atualizar_shortlink, args=(_tunnel_url,), daemon=True).start()
     except Exception:
         pass
 
 
 @app.route("/api/tunnel/start", methods=["POST"])
 def api_tunnel_start():
-    global _tunnel_proc, _tunnel_url, _tunnel_log
+    global _tunnel_proc, _tunnel_url, _tunnel_log, _shortlink_url
 
     with _tunnel_lock:
         # Se já está a correr, devolve o estado actual
@@ -533,6 +584,7 @@ def api_tunnel_start():
         # Reinicia estado
         _tunnel_url = None
         _tunnel_log = []
+        _shortlink_url = None
 
         # Tenta lançar o cloudflared
         try:
