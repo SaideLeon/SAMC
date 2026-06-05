@@ -452,7 +452,7 @@ def api_sms_enviar():
 
     try:
         result = subprocess.run(
-            ["termux-sms-send", "-n", numero, corpo],
+            ["termux-sms-send", "-n", numero, "-s 0", corpo],
             capture_output=True, text=True, timeout=30
         )
         if result.returncode == 0:
