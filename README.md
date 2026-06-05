@@ -31,8 +31,14 @@ As versões do **Google Play Store não funcionam** — as APIs internas são di
 
 ```bash
 pkg update && pkg upgrade -y
-pkg install python git termux-api
+pkg install python git termux-api cloudflared
 ```
+
+> **Nota sobre cada pacote:**
+> - `python` — runtime necessário para o backend Flask
+> - `git` — para clonar e actualizar o repositório
+> - `termux-api` — bridge entre o Python e as APIs do Android (SMS, etc.)
+> - `cloudflared` — expõe o SAMC publicamente via Cloudflare Tunnel (acesso remoto sem configurar o router)
 
 ### 2. Clonar o projecto
 
@@ -75,6 +81,40 @@ Acede a `http://localhost:5000` no browser do telemóvel.
 
 ---
 
+## Cloudflare Tunnel (acesso remoto)
+
+O SAMC inclui suporte nativo a **Cloudflare Tunnel** para acederes à aplicação de qualquer dispositivo, sem precisar de configurar o router ou conhecer o IP local.
+
+### Verificar instalação
+
+```bash
+cloudflared --version
+```
+
+Se o comando não for reconhecido, instala manualmente:
+
+```bash
+pkg install cloudflared
+```
+
+### Usar o tunnel pela interface
+
+1. Inicia o servidor normalmente com `python app.py`
+2. Abre o SAMC no browser e vai ao menu **Rede → Tunnel**
+3. Clica em **Iniciar Tunnel**
+4. Aguarda a URL pública (ex: `https://xyz-abc.trycloudflare.com`)
+5. Partilha ou acede a essa URL de qualquer dispositivo
+
+### Usar o tunnel manualmente (linha de comandos)
+
+```bash
+cloudflared tunnel --url http://localhost:5000
+```
+
+> O tunnel usa URLs temporárias gratuitas do Cloudflare — não requerem conta nem configuração adicional.
+
+---
+
 ## Funcionalidades
 
 - **Mensagens Recentes** — lista as últimas N mensagens da caixa de entrada
@@ -85,6 +125,9 @@ Acede a `http://localhost:5000` no browser do telemóvel.
 - **Anti-Spam** — detecção heurística + classificação via Gemini
 - **Chat IA** — conversa com Gemini sobre as tuas mensagens (SSE streaming)
 - **Análise de Remetentes** — identifica remetentes suspeitos com IA
+- **Dr. Alma** — psicóloga de casais: analisa conversas SMS e gera relatório clínico
+- **Enviar SMS** — envia SMS directamente pelo Termux
+- **Cloudflare Tunnel** — expõe o SAMC publicamente com um clique
 
 ---
 
@@ -99,9 +142,13 @@ SAMC/
 │   └── index.html          # SPA principal
 └── static/
     ├── css/
-    │   └── style.css       # Estilos da interface
+    │   ├── style.css       # Estilos da interface principal
+    │   ├── enviar.css      # Estilos do painel de envio
+    │   └── alma.css        # Estilos da Dr. Alma
     └── js/
         ├── app.js          # Lógica do frontend (SPA)
+        ├── enviar.js       # Painel de envio de SMS
+        ├── alma.js         # Módulo Dr. Alma
         └── md.js           # Renderizador de Markdown
 ```
 
@@ -117,13 +164,15 @@ SAMC/
 
 ## Stack Técnica
 
-| Componente | Tecnologia                     |
-|------------|--------------------------------|
-| Backend    | Python · Flask                 |
-| IA         | Google Gemini 2.5 Flash        |
-| Streaming  | SSE (Server-Sent Events)       |
-| Frontend   | HTML · CSS · JS vanilla        |
-| SMS        | Termux:API (`termux-sms-list`) |
+| Componente | Tecnologia                          |
+|------------|-------------------------------------|
+| Backend    | Python · Flask                      |
+| IA         | Google Gemini 2.5 Flash             |
+| Streaming  | SSE (Server-Sent Events)            |
+| Frontend   | HTML · CSS · JS vanilla             |
+| SMS        | Termux:API (`termux-sms-list`)      |
+| Rede       | Cloudflare Tunnel (`cloudflared`)   |
+| PWA        | Service Worker · Web App Manifest   |
 
 ---
 
