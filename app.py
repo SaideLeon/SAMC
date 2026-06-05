@@ -437,7 +437,7 @@ def api_export_json():
 
 # ─── API: Enviar SMS ──────────────────────────────────────────────────────────
 
-@@app.route("/api/sms/enviar", methods=["POST"])
+@app.route("/api/sms/enviar", methods=["POST"])
 def api_sms_enviar():
     data   = request.json or {}
     numero = (data.get("numero") or "").strip()
