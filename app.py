@@ -443,6 +443,11 @@ def api_sms_enviar():
     numero = (data.get("numero") or "").strip()
     corpo  = (data.get("corpo") or "").strip()
 
+    try:
+        slot = int(data.get("slot", 0))
+    except (TypeError, ValueError):
+        return jsonify({"ok": False, "erro": "SIM slot inválido"}), 400
+
     if not numero:
         return jsonify({"ok": False, "erro": "Número em falta"}), 400
     if not corpo:
@@ -452,12 +457,20 @@ def api_sms_enviar():
 
     try:
         result = subprocess.run(
-            ["termux-sms-send", "-n", numero, corpo],
+            ["termux-sms-send", "-n", numero, "-s", str(slot), corpo],
             capture_output=True, text=True, timeout=30
         )
+
+        # O returncode é a fonte de verdade: stderr pode conter avisos mesmo em sucesso.
         if result.returncode == 0:
-            return jsonify({"ok": True, "mensagem": f"SMS enviado para {numero}"})
-        err = result.stderr.strip() or "Erro desconhecido"
+            aviso = result.stderr.strip()
+            return jsonify({
+                "ok": True,
+                "mensagem": f"SMS enviado para {numero}",
+                "aviso": aviso or None,
+            })
+
+        err = result.stderr.strip() or result.stdout.strip() or "Erro desconhecido"
         return jsonify({"ok": False, "erro": err}), 500
     except subprocess.TimeoutExpired:
         return jsonify({"ok": False, "erro": "Timeout ao enviar"}), 500
