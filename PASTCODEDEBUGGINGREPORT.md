@@ -1,4 +1,4 @@
-## Documento Histórico de Correção — Parâmetros do `termux-sms-list`
+## Documento Histórico de Correção — Parâmetros do `termux-sms-list` @
 
 ### 1. Descrição do problema
 
@@ -96,4 +96,3 @@ A partir desta correção, deve-se garantir que:
 * Todas as flags do `termux-sms-list` sejam sempre passadas no formato `--flag=valor`.
 * Nunca utilizar separação por espaço (`--flag valor`) para este comando, pois não é suportado nesta versão.
 
----
