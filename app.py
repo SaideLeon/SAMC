@@ -475,6 +475,41 @@ def api_sms_enviar():
 def api_status():
     return jsonify({"gemini": bool(gemini_key()), "termux": True})
 
+# ─── Backup / Sincronização Supabase ───────────────────────────────────────────
+# Ver backup/backup_diario.py e backup/sync_supabase.py — normalmente correm
+# sozinhos via termux-job-scheduler (boot/samc-boot.sh), estas rotas servem
+# apenas para consultar o estado e forçar uma corrida manual pela interface.
+
+_BACKUP_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "backup")
+if _BACKUP_DIR not in __import__("sys").path:
+    __import__("sys").path.insert(0, _BACKUP_DIR)
+
+@app.route("/api/backup/estado")
+def api_backup_estado():
+    try:
+        import estado as _estado
+        pendentes = [f for f in os.listdir(_estado.PENDING_DIR) if f.endswith(".json")]
+        return jsonify({
+            "ok": True,
+            **_estado.carregar_estado(),
+            "pendentes": len(pendentes),
+        })
+    except Exception as e:
+        return jsonify({"ok": False, "erro": str(e)}), 500
+
+@app.route("/api/backup/agora", methods=["POST"])
+def api_backup_agora():
+    def correr():
+        try:
+            import backup_diario, sync_supabase
+            backup_diario.principal()
+            sync_supabase.principal()
+        except Exception as e:
+            print(f"[backup manual] erro: {e}", flush=True)
+
+    threading.Thread(target=correr, daemon=True).start()
+    return jsonify({"ok": True, "mensagem": "Backup e sincronização iniciados em segundo plano."})
+
 # ─── PWA ─────────────────────────────────────────────────────────────────────
 
 @app.route("/sw.js")
